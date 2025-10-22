@@ -1,2 +1,7 @@
 .DS_*
+<<<<<<< Updated upstream
 /target/
+=======
+.codex/
+.specify/
+>>>>>>> Stashed changes
