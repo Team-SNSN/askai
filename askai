@@ -1,8 +1,0 @@
-#!/usr/bin/env zsh
-# askai: natural language → shell command helper
-if [[ $# -eq 0 ]]; then
-  echo "usage: askai <text>"; exit 1
-fi
-
-query="$*"
-echo "[askai] $query"
