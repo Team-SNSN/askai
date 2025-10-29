@@ -1,4 +1,11 @@
-.DS_*
+# OS file system
+.DS_Store
+
+# Dev ai tools
 /target/
 .codex/
 .specify/
+Claude.md
+
+# docs
+*.md
