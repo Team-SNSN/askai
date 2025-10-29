@@ -2,6 +2,7 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "askai")]
+#[command(version)]
 #[command(about = "AI-powered terminal automation", long_about = None)]
 pub struct Cli {
     /// 자연어 프롬프트
