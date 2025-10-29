@@ -2,7 +2,7 @@ class Askai < Formula
   desc "AI-powered terminal automation tool"
   homepage "https://github.com/Team-SNSN/askai"
   url "https://github.com/Team-SNSN/askai/archive/v0.1.0.tar.gz"
-  sha256 "" # TODO: Update with actual SHA256 after release
+  sha256 "22aebfb0e5012ffbdce3e432de46eabd3bab4efaeeada69cb68bbfc968059c7c"
   license "MIT"
   version "0.1.0"
 
