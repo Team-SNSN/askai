@@ -9,6 +9,9 @@ mod ui;
 
 use cli::Cli;
 use error::Result;
+use ai::{context, gemini::GeminiProvider};
+use executor::{CommandValidator, CommandRunner};
+use ui::ConfirmPrompt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,11 +21,49 @@ async fn main() -> Result<()> {
         println!("{} {:?}", "DEBUG:".yellow(), cli);
     }
 
+    // 1. 프롬프트 출력
     println!("{} {}", "🔍 프롬프트:".cyan(), cli.prompt_text());
 
-    // TODO: AI 명령어 생성
-    // TODO: 안전성 검사
-    // TODO: 실행
+    // 2. 컨텍스트 수집
+    let ctx = context::get_current_context();
+    if cli.debug {
+        println!("{} {}", "DEBUG Context:".yellow(), ctx);
+    }
+
+    // 3. AI 명령어 생성
+    println!("{}", "🤖 AI가 명령어를 생성하는 중...".cyan());
+    let gemini = GeminiProvider::new();
+    let command = gemini.generate_command(&cli.prompt_text(), &ctx).await?;
+
+    // 4. 안전성 검사
+    let validator = CommandValidator::new();
+    let danger_level = validator.validate(&command)?;
+
+    // 5. 사용자 확인 (--yes 플래그가 없으면)
+    if !cli.yes && !cli.dry_run {
+        let prompt = ConfirmPrompt::new();
+        if !prompt.confirm_execution(&command, danger_level)? {
+            println!("{}", "❌ 사용자가 취소했습니다.".yellow());
+            return Ok(());
+        }
+    } else if cli.dry_run {
+        // dry-run 모드: 명령어만 출력
+        println!("\n{}", "📋 생성된 명령어:".cyan().bold());
+        println!("  {}", command.green());
+        println!("\n{} 명령어만 출력합니다 (실행하지 않음).", "ℹ️".cyan());
+        return Ok(());
+    } else {
+        // --yes 플래그: 명령어 출력만 하고 바로 실행
+        println!("\n{}", "📋 생성된 명령어:".cyan().bold());
+        println!("  {}", command.green());
+        println!("{}", "\n⚡ 자동 승인 모드로 실행합니다...".yellow());
+    }
+
+    // 7. 명령어 실행
+    let runner = CommandRunner::new();
+    runner.execute(&command).await?;
+
+    println!("\n{}", "✅ 완료!".green().bold());
 
     Ok(())
 }
