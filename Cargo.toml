@@ -4,3 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# CLI 프레임워크
+clap = { version = "4.5", features = ["derive"] }
+
+# 에러 핸들링
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 프로세스 실행
+tokio = { version = "1.40", features = ["process", "rt-multi-thread", "macros"] }
+
+# 터미널 UI
+colored = "2.1"
+dialoguer = "0.11"
+
+# 직렬화 (설정 파일용)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
