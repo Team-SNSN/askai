@@ -9,7 +9,7 @@ mod ui;
 
 use cli::Cli;
 use error::Result;
-use ai::{context, gemini::GeminiProvider};
+use ai::{context, factory::ProviderFactory};
 use executor::{CommandValidator, CommandRunner};
 use ui::ConfirmPrompt;
 
@@ -30,10 +30,18 @@ async fn main() -> Result<()> {
         println!("{} {}", "DEBUG Context:".yellow(), ctx);
     }
 
-    // 3. AI 명령어 생성
-    println!("{}", "🤖 AI가 명령어를 생성하는 중...".cyan());
-    let gemini = GeminiProvider::new();
-    let command = gemini.generate_command(&cli.prompt_text(), &ctx).await?;
+    // 3. AI provider 선택 및 명령어 생성
+    if cli.debug {
+        println!("{} {}", "DEBUG Provider:".yellow(), cli.provider);
+    }
+
+    let provider = ProviderFactory::create(&cli.provider)?;
+
+    println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
+             "🤖".cyan(),
+             provider.name());
+
+    let command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
 
     // 4. 안전성 검사
     let validator = CommandValidator::new();
