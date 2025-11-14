@@ -9,10 +9,12 @@
 ## ✨ 특징
 
 - 🤖 **자연어 명령어 생성**: 한국어/영어 프롬프트를 bash 명령어로 자동 변환
+- 🔄 **멀티 AI Provider 지원**: Gemini, Claude, Codex 등 여러 AI CLI 지원
 - 🔒 **안전성 보장**: 위험한 명령어 자동 차단 및 사용자 확인
 - ⚡ **빠른 실행**: Rust로 작성되어 빠른 성능
 - 🎨 **직관적인 UI**: 색상 코딩과 대화형 프롬프트
 - 🛠️ **다양한 옵션**: dry-run, 자동 승인, 디버그 모드 지원
+- 🔌 **확장 가능한 구조**: 새로운 AI provider를 쉽게 추가 가능
 
 ## 📋 목차
 
@@ -56,12 +58,27 @@ Arguments:
   <PROMPT>...  자연어 프롬프트
 
 Options:
-  -p, --provider <PROVIDER>  AI 제공자 선택 (gemini, claude) [default: gemini]
+  -p, --provider <PROVIDER>  AI 제공자 선택 (gemini, claude, codex) [default: gemini]
   -y, --yes                  확인 없이 바로 실행 (위험)
       --dry-run              명령어만 출력하고 실행하지 않음
   -d, --debug                디버그 모드
   -h, --help                 도움말 출력
   -V, --version              버전 정보 출력
+```
+
+### Provider 선택
+
+다양한 AI provider를 선택하여 사용할 수 있습니다:
+
+```bash
+# Gemini 사용 (기본값)
+askai "파일 목록"
+
+# Claude 사용
+askai -p claude "파일 목록"
+
+# Codex 사용
+askai -p codex "파일 목록"
 ```
 
 ## 💡 예시
@@ -121,21 +138,41 @@ $ askai "현재 시간" --yes
 
 - Rust 1.70 이상 (rustup으로 설치 권장)
 
-### Gemini CLI
+### AI Provider CLI 설치
 
-`askai`는 Gemini CLI를 사용하여 명령어를 생성합니다. 아래 명령어로 설치하세요:
+`askai`는 사용자 환경에 설치된 AI CLI를 활용합니다. 사용하려는 provider에 맞춰 CLI를 설치하세요:
+
+#### Gemini CLI (기본값)
 
 ```bash
 npm install -g @google/generative-ai-cli
 ```
 
-설치 후 Gemini API 키를 설정해야 합니다:
+설치 후 API 키 설정:
 
 ```bash
 gemini config set apiKey YOUR_API_KEY
 ```
 
 API 키는 [Google AI Studio](https://makersuite.google.com/app/apikey)에서 발급받을 수 있습니다.
+
+#### Claude CLI
+
+```bash
+npm install -g @anthropics/claude-cli
+```
+
+설치 후 해당 CLI의 설정 방법에 따라 API 키를 설정하세요.
+
+#### Codex CLI
+
+```bash
+npm install -g openai-codex-cli
+```
+
+설치 후 해당 CLI의 설정 방법에 따라 API 키를 설정하세요.
+
+**참고**: 최소 하나 이상의 AI provider CLI가 설치되어 있어야 합니다.
 
 ## 🔒 안전 기능
 
@@ -197,17 +234,20 @@ cargo clippy
 - [x] 단일 명령어 생성 및 실행
 - [x] 기본 안전성 검사
 - [x] 테스트 작성
+- [x] 멀티 AI Provider 지원 (Gemini, Claude, Codex)
+- [x] 확장 가능한 Provider 아키텍처
 
 ### 🔄 Phase 2: 핵심 기능 (계획 중)
 - [ ] 프로젝트 자동 탐색 및 인식
 - [ ] 배치 작업 지원
 - [ ] 병렬 실행
 - [ ] 명령어 히스토리 관리
+- [ ] 추가 AI Provider 지원 (GPT-4, etc.)
 
 ### 🔮 Phase 3: 고급 기능 (계획 중)
-- [ ] Claude Code 통합
 - [ ] 컨텍스트 학습
 - [ ] 롤백 기능
+- [ ] 플러그인 시스템
 
 ## 📄 라이선스
 

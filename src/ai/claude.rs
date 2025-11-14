@@ -3,9 +3,9 @@ use crate::ai::AiProvider;
 use async_trait::async_trait;
 use tokio::process::Command;
 
-pub struct GeminiProvider;
+pub struct ClaudeProvider;
 
-impl GeminiProvider {
+impl ClaudeProvider {
     pub fn new() -> Self {
         Self
     }
@@ -38,15 +38,11 @@ impl GeminiProvider {
         }
 
         // 2. 마크다운 코드 블록 제거
-        // ```bash\ncommand\n``` → command
-        // ```\ncommand\n``` → command
         if command.contains("```") {
-            // ```bash 또는 ``` 로 시작하는 코드 블록 추출
             let re = regex::Regex::new(r"```(?:bash|sh)?\n(.*?)\n```").unwrap();
             if let Some(caps) = re.captures(&command) {
                 command = caps.get(1).map_or("", |m| m.as_str()).to_string();
             } else {
-                // 단순히 ``` 제거
                 command = command.replace("```bash", "")
                     .replace("```sh", "")
                     .replace("```", "")
@@ -79,7 +75,6 @@ impl GeminiProvider {
             .collect();
 
         if lines.len() > 1 {
-            // 첫 번째 줄이 설명이고 두 번째 줄이 명령어인 경우 감지
             if lines[0].ends_with(':') || lines[0].len() > 50 {
                 command = lines.get(1).unwrap_or(&lines[0]).to_string();
             } else {
@@ -102,13 +97,13 @@ impl GeminiProvider {
 }
 
 #[async_trait]
-impl AiProvider for GeminiProvider {
+impl AiProvider for ClaudeProvider {
     fn name(&self) -> &str {
-        "gemini"
+        "claude"
     }
 
     fn cli_command(&self) -> &str {
-        "gemini"
+        "claude"
     }
 
     async fn check_installation(&self) -> Result<()> {
@@ -120,8 +115,8 @@ impl AiProvider for GeminiProvider {
 
         if !output.status.success() {
             return Err(AskAiError::AiCliError(
-                "Gemini CLI가 설치되어 있지 않습니다.\n\
-                 설치 방법: npm install -g @google/generative-ai-cli"
+                "Claude CLI가 설치되어 있지 않습니다.\n\
+                 설치 방법: npm install -g @anthropics/claude-cli"
                     .to_string(),
             ));
         }
@@ -130,15 +125,16 @@ impl AiProvider for GeminiProvider {
     }
 
     async fn generate_command(&self, prompt: &str, context: &str) -> Result<String> {
-        // Gemini CLI가 설치되어 있는지 확인
+        // Claude CLI가 설치되어 있는지 확인
         self.check_installation().await?;
 
-        // 최적화된 프롬프트 생성 (속도와 품질 균형)
+        // Claude용 최적화된 프롬프트 생성
         let full_prompt = format!(
             "You are a bash command generator. Convert natural language to a single bash command.\n\n\
              RULES:\n\
              - Output ONLY the bash command (no explanations, no markdown)\n\
-             - Do NOT say \"I cannot\" or similar - just output the command\n\n\
+             - Do NOT say \"I cannot\" or similar - just output the command\n\
+             - Be precise and accurate\n\n\
              Context: {}\n\
              Request: {}\n\n\
              Examples:\n\
@@ -150,8 +146,8 @@ impl AiProvider for GeminiProvider {
             context, prompt
         );
 
-        // Gemini CLI 호출 (기본 모델 사용)
-        let output = Command::new("gemini")
+        // Claude CLI 호출
+        let output = Command::new(self.cli_command())
             .arg(&full_prompt)
             .output()
             .await
@@ -179,85 +175,19 @@ mod tests {
 
     #[test]
     fn test_postprocess_clean_command() {
-        let provider = GeminiProvider::new();
+        let provider = ClaudeProvider::new();
         let result = provider.postprocess_response("ls -la").unwrap();
         assert_eq!(result, "ls -la");
     }
 
     #[test]
     fn test_postprocess_markdown_code_block() {
-        let provider = GeminiProvider::new();
+        let provider = ClaudeProvider::new();
 
-        // ```bash\ncommand\n```
         let result = provider.postprocess_response("```bash\ngit status\n```").unwrap();
         assert_eq!(result, "git status");
 
-        // ```\ncommand\n```
         let result = provider.postprocess_response("```\ndate\n```").unwrap();
         assert_eq!(result, "date");
-    }
-
-    #[test]
-    fn test_postprocess_prefix_removal() {
-        let provider = GeminiProvider::new();
-
-        let result = provider.postprocess_response("Here is the command: ls -la").unwrap();
-        assert_eq!(result, "ls -la");
-
-        let result = provider.postprocess_response("You can use: git status").unwrap();
-        assert_eq!(result, "git status");
-    }
-
-    #[test]
-    fn test_postprocess_multiline_response() {
-        let provider = GeminiProvider::new();
-
-        // 첫 번째 줄만 추출
-        let result = provider.postprocess_response("ls -la\nThis lists all files").unwrap();
-        assert_eq!(result, "ls -la");
-
-        // 설명이 첫 줄인 경우 두 번째 줄 추출
-        let result = provider.postprocess_response("This is a command to list files:\nls -la").unwrap();
-        assert_eq!(result, "ls -la");
-    }
-
-    #[test]
-    fn test_postprocess_invalid_response() {
-        let provider = GeminiProvider::new();
-
-        // "I am unable to" 패턴 감지
-        let result = provider.postprocess_response(
-            "I am unable to execute shell commands. I will try to find a solution."
-        );
-        assert!(result.is_err());
-
-        // "I cannot" 패턴 감지
-        let result = provider.postprocess_response("I cannot run this command");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_postprocess_empty_response() {
-        let provider = GeminiProvider::new();
-
-        let result = provider.postprocess_response("");
-        assert!(result.is_err());
-
-        let result = provider.postprocess_response("   \n  \n  ");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_postprocess_complex_case() {
-        let provider = GeminiProvider::new();
-
-        // 마크다운 + 프리픽스 조합
-        let result = provider.postprocess_response(
-            "Here is the command:\n```bash\nfind . -name \"*.txt\"\n```"
-        );
-        assert!(result.is_ok());
-        let cmd = result.unwrap();
-        assert!(cmd.contains("find"));
-        assert!(cmd.contains("*.txt"));
     }
 }

@@ -14,6 +14,9 @@ thiserror = "1.0"
 # 프로세스 실행
 tokio = { version = "1.40", features = ["process", "rt-multi-thread", "macros"] }
 
+# 비동기 trait 지원
+async-trait = "0.1"
+
 # 터미널 UI
 colored = "2.1"
 dialoguer = "0.11"
