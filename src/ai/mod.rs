@@ -3,6 +3,7 @@ pub mod gemini;
 pub mod claude;
 pub mod codex;
 pub mod factory;
+pub mod history;
 
 use crate::error::Result;
 use async_trait::async_trait;

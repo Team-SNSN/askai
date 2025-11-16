@@ -9,9 +9,10 @@ mod ui;
 
 use cli::Cli;
 use error::Result;
-use ai::{context, factory::ProviderFactory};
+use ai::{context, factory::ProviderFactory, history::{CommandHistory, HistoryStore}};
 use executor::{CommandValidator, CommandRunner};
 use ui::ConfirmPrompt;
+use chrono::Utc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,8 +25,8 @@ async fn main() -> Result<()> {
     // 1. 프롬프트 출력
     println!("{} {}", "🔍 프롬프트:".cyan(), cli.prompt_text());
 
-    // 2. 컨텍스트 수집
-    let ctx = context::get_current_context();
+    // 2. 컨텍스트 수집 (RAG: 관련 히스토리 포함)
+    let ctx = context::get_context_with_history(&cli.prompt_text());
     if cli.debug {
         println!("{} {}", "DEBUG Context:".yellow(), ctx);
     }
@@ -59,6 +60,18 @@ async fn main() -> Result<()> {
         println!("\n{}", "📋 생성된 명령어:".cyan().bold());
         println!("  {}", command.green());
         println!("\n{} 명령어만 출력합니다 (실행하지 않음).", "ℹ️".cyan());
+
+        // dry-run도 히스토리에 저장 (실행하지 않음으로 표시)
+        let store = HistoryStore::new();
+        let history_entry = CommandHistory {
+            prompt: cli.prompt_text(),
+            command: command.clone(),
+            timestamp: Utc::now(),
+            executed: false,
+            provider: cli.provider.clone(),
+        };
+        let _ = store.add(history_entry); // 실패해도 무시
+
         return Ok(());
     } else {
         // --yes 플래그: 명령어 출력만 하고 바로 실행
@@ -69,7 +82,27 @@ async fn main() -> Result<()> {
 
     // 7. 명령어 실행
     let runner = CommandRunner::new();
-    runner.execute(&command).await?;
+    let execution_result = runner.execute(&command).await;
+
+    // 8. 히스토리 저장 (RAG)
+    let store = HistoryStore::new();
+    let history_entry = CommandHistory {
+        prompt: cli.prompt_text(),
+        command: command.clone(),
+        timestamp: Utc::now(),
+        executed: execution_result.is_ok(),
+        provider: cli.provider.clone(),
+    };
+
+    if let Err(e) = store.add(history_entry) {
+        if cli.debug {
+            println!("{} 히스토리 저장 실패: {}", "DEBUG:".yellow(), e);
+        }
+        // 히스토리 저장 실패는 치명적이지 않으므로 계속 진행
+    }
+
+    // 실행 결과 확인
+    execution_result?;
 
     println!("\n{}", "✅ 완료!".green().bold());
 

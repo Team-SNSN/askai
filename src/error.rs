@@ -16,6 +16,9 @@ pub enum AskAiError {
 
     #[error("IO 에러: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("JSON 직렬화/역직렬화 에러: {0}")]
+    JsonError(#[from] serde_json::Error),
 }
 
 pub type Result<T> = std::result::Result<T, AskAiError>;

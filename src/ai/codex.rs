@@ -1,7 +1,14 @@
 use crate::error::{AskAiError, Result};
-use crate::ai::AiProvider;
+use crate::ai::{AiProvider, factory::ProviderFactory};
 use async_trait::async_trait;
 use tokio::process::Command;
+use once_cell::sync::Lazy;
+use regex::Regex;
+
+/// 사전 컴파일된 정규표현식 (성능 최적화)
+static CODE_BLOCK_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"```(?:bash|sh)?\n(.*?)\n```").unwrap()
+});
 
 pub struct CodexProvider;
 
@@ -39,8 +46,8 @@ impl CodexProvider {
 
         // 2. 마크다운 코드 블록 제거
         if command.contains("```") {
-            let re = regex::Regex::new(r"```(?:bash|sh)?\n(.*?)\n```").unwrap();
-            if let Some(caps) = re.captures(&command) {
+            // 사전 컴파일된 정규표현식 사용 (성능 최적화)
+            if let Some(caps) = CODE_BLOCK_REGEX.captures(&command) {
                 command = caps.get(1).map_or("", |m| m.as_str()).to_string();
             } else {
                 command = command.replace("```bash", "")
@@ -107,25 +114,16 @@ impl AiProvider for CodexProvider {
     }
 
     async fn check_installation(&self) -> Result<()> {
-        let output = Command::new("which")
-            .arg(self.cli_command())
-            .output()
-            .await
-            .map_err(|e| AskAiError::AiCliError(e.to_string()))?;
-
-        if !output.status.success() {
-            return Err(AskAiError::AiCliError(
-                "Codex CLI가 설치되어 있지 않습니다.\n\
-                 설치 방법: npm install -g openai-codex-cli"
-                    .to_string(),
-            ));
-        }
-
-        Ok(())
+        // 캐싱된 설치 확인 사용 (성능 최적화)
+        ProviderFactory::check_installation(
+            self.cli_command(),
+            "Codex CLI가 설치되어 있지 않습니다.\n\
+             설치 방법: npm install -g openai-codex-cli"
+        ).await
     }
 
     async fn generate_command(&self, prompt: &str, context: &str) -> Result<String> {
-        // Codex CLI가 설치되어 있는지 확인
+        // Codex CLI가 설치되어 있는지 확인 (캐싱됨)
         self.check_installation().await?;
 
         // Codex용 최적화된 프롬프트 생성
