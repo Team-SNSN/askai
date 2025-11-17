@@ -6,17 +6,26 @@ mod error;
 mod ai;
 mod executor;
 mod ui;
+mod config;
+mod context;
 
 use cli::Cli;
 use error::Result;
-use ai::{context, factory::ProviderFactory, history::{CommandHistory, HistoryStore}};
+use ai::{factory::ProviderFactory, history::{CommandHistory, HistoryStore}};
 use executor::{CommandValidator, CommandRunner};
 use ui::ConfirmPrompt;
 use chrono::Utc;
+use config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // 설정 파일 로드 (없으면 기본값 사용)
+    let config = Config::load().unwrap_or_default();
+
+    // Provider 결정: CLI 옵션 > 설정 파일 > 기본값
+    let provider_name = cli.provider.as_deref().unwrap_or(&config.default_provider);
 
     if cli.debug {
         println!("{} {:?}", "DEBUG:".yellow(), cli);
@@ -33,10 +42,10 @@ async fn main() -> Result<()> {
 
     // 3. AI provider 선택 및 명령어 생성
     if cli.debug {
-        println!("{} {}", "DEBUG Provider:".yellow(), cli.provider);
+        println!("{} {}", "DEBUG Provider:".yellow(), provider_name);
     }
 
-    let provider = ProviderFactory::create(&cli.provider)?;
+    let provider = ProviderFactory::create(provider_name)?;
 
     println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
              "🤖".cyan(),
@@ -68,7 +77,7 @@ async fn main() -> Result<()> {
             command: command.clone(),
             timestamp: Utc::now(),
             executed: false,
-            provider: cli.provider.clone(),
+            provider: provider_name.to_string(),
         };
         let _ = store.add(history_entry); // 실패해도 무시
 
@@ -91,7 +100,7 @@ async fn main() -> Result<()> {
         command: command.clone(),
         timestamp: Utc::now(),
         executed: execution_result.is_ok(),
-        provider: cli.provider.clone(),
+        provider: provider_name.to_string(),
     };
 
     if let Err(e) = store.add(history_entry) {
