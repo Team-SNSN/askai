@@ -1,9 +1,10 @@
-pub mod context;
 pub mod gemini;
 pub mod claude;
 pub mod codex;
 pub mod factory;
 pub mod history;
+pub mod response_processor;
+pub mod prompt_template;
 
 use crate::error::Result;
 use async_trait::async_trait;
