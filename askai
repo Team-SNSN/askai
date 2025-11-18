@@ -1,0 +1,43 @@
+#!/bin/bash
+# askai wrapper - 실제 바이너리를 감싸는 스크립트
+# 이 파일을 PATH에 설치하면 `askai "명령어"`로 사용 가능
+
+# 실제 바이너리 경로 (개발 경로 우선)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/target/debug/askai" ]; then
+    ASKAI_BIN="$SCRIPT_DIR/target/debug/askai"
+elif [ -f "$SCRIPT_DIR/target/release/askai" ]; then
+    ASKAI_BIN="$SCRIPT_DIR/target/release/askai"
+elif [ -f "$HOME/.local/bin/askai-bin" ]; then
+    ASKAI_BIN="$HOME/.local/bin/askai-bin"
+elif command -v "askai-bin" &> /dev/null; then
+    ASKAI_BIN="askai-bin"
+else
+    echo "❌ askai 바이너리를 찾을 수 없습니다." >&2
+    echo "   먼저 'cargo build'를 실행하세요." >&2
+    exit 1
+fi
+
+# 특별한 옵션들은 바이너리로 직접 전달
+if [[ "$1" == "--help" ]] || [[ "$1" == "--version" ]] || \
+   [[ "$1" == "--clear-cache" ]] || [[ "$1" == "--prewarm-cache" ]] || \
+   [[ "$1" == "--daemon-start" ]] || [[ "$1" == "--daemon-stop" ]] || \
+   [[ "$1" == "--daemon-status" ]] || [[ "$1" == "--batch" ]] || \
+   [[ "$1" == "--debug" ]] || [[ "$1" == "-d" ]]; then
+    exec "$ASKAI_BIN" "$@"
+fi
+
+# 일반 명령어 생성 및 실행
+cmd=$("$ASKAI_BIN" --quiet --yes "$@")
+
+if [ $? -eq 0 ] && [ -n "$cmd" ]; then
+    # 생성된 명령어를 stderr에 표시
+    echo "🤖 실행: $cmd" >&2
+
+    # 명령어 실행
+    eval "$cmd"
+else
+    # 에러 발생시 일반 모드로 실행
+    exec "$ASKAI_BIN" "$@"
+fi
