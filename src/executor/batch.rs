@@ -187,17 +187,65 @@ impl BatchExecutor {
         }
     }
 
-    /// 여러 작업 병렬 실행
+    /// 여러 작업 병렬 실행 (tokio::spawn 사용)
     async fn execute_parallel(&self, tasks: &[&Task]) -> Vec<TaskResult> {
-        // 간단한 병렬 실행 (실제로는 순차 실행, Phase 3에서 tokio::spawn 사용)
-        let mut results = Vec::new();
+        use futures::future::join_all;
 
-        for task in tasks {
-            let result = self.execute_task(task).await;
-            results.push(result);
-        }
+        let tasks_to_execute: Vec<_> = tasks.iter().map(|&t| t.clone()).collect();
+
+        let handles: Vec<_> = tasks_to_execute
+            .into_iter()
+            .map(|task| {
+                let runner = CommandRunner::new();
+                tokio::spawn(async move {
+                    let start_time = Instant::now();
+
+                    println!(
+                        "  {} {}",
+                        "▶️".cyan(),
+                        task.description.dimmed()
+                    );
+
+                    // working_dir이 있으면 cd를 포함한 명령어 생성
+                    let command = if let Some(dir) = &task.working_dir {
+                        format!("cd {} && {}", dir, task.command)
+                    } else {
+                        task.command.clone()
+                    };
+
+                    match runner.execute(&command).await {
+                        Ok(output) => {
+                            let duration = start_time.elapsed().as_millis();
+                            println!(
+                                "    {} {} ({}ms)",
+                                "✓".green(),
+                                task.description,
+                                duration
+                            );
+                            TaskResult::success(&task, output, duration)
+                        }
+                        Err(e) => {
+                            let duration = start_time.elapsed().as_millis();
+                            println!(
+                                "    {} {} - {}",
+                                "✗".red(),
+                                task.description,
+                                e.to_string().red()
+                            );
+                            TaskResult::failure(&task, e.to_string(), duration)
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        // 모든 작업이 완료될 때까지 대기
+        let results = join_all(handles).await;
 
         results
+            .into_iter()
+            .filter_map(|r| r.ok())
+            .collect()
     }
 }
 

@@ -1,10 +1,12 @@
 pub mod project;
 pub mod detector;
+pub mod scanner;
 
 use std::env;
 use crate::ai::history::HistoryStore;
 pub use project::{ProjectInfo, ProjectType};
 pub use detector::ProjectDetector;
+pub use scanner::{ProjectScanner, ScanResult};
 
 /// 현재 실행 환경의 컨텍스트 정보를 수집
 pub fn get_current_context() -> String {
