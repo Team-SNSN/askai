@@ -9,18 +9,64 @@ class Askai < Formula
   depends_on "rust" => :build
 
   def install
-    system "cargo", "install", *std_cargo_args
+    # Rust 바이너리 빌드
+    system "cargo", "build", "--release", "--locked"
+
+    # 바이너리를 askai-bin으로 설치
+    bin.install "target/release/askai" => "askai-bin"
+
+    # Wrapper 스크립트 생성 및 설치
+    (bin/"askai").write wrapper_script
+  end
+
+  def wrapper_script
+    <<~EOS
+      #!/bin/bash
+      # askai wrapper - Homebrew 버전
+      # 이 스크립트는 명령어를 현재 쉘에서 실행할 수 있게 합니다
+
+      ASKAI_BIN="#{opt_bin}/askai-bin"
+
+      # 특별한 옵션들은 바이너리로 직접 전달
+      case "$1" in
+          --help|--version|--clear-cache|--prewarm-cache|--daemon-*|--batch|-d|--debug)
+              exec "$ASKAI_BIN" "$@"
+              ;;
+      esac
+
+      # 일반 명령어 생성 및 실행
+      if [ $# -eq 0 ]; then
+          echo "사용법: askai \\"자연어 명령어\\"" >&2
+          echo "예시: askai \\"현재 시간\\"" >&2
+          exit 1
+      fi
+
+      # 명령어 생성
+      cmd=$("$ASKAI_BIN" --quiet --yes "$@" 2>/dev/null)
+
+      if [ $? -eq 0 ] && [ -n "$cmd" ]; then
+          # 명령어 실행 (eval 사용)
+          eval "$cmd"
+      else
+          # 에러 발생시 일반 모드로 실행
+          exec "$ASKAI_BIN" "$@"
+      fi
+    EOS
   end
 
   def caveats
     <<~EOS
-      askai requires Gemini CLI to be installed and configured.
+      🎉 askai가 설치되었습니다!
 
-      Install Gemini CLI:
-        npm install -g @google/generative-ai-cli
+      이제 eval 없이 직접 사용할 수 있습니다:
+        askai "현재 시간"
+        askai "src 디렉토리로 이동"
+        askai "모든 파일 목록"
 
-      Configure API key:
-        gemini config set apiKey YOUR_API_KEY
+      💡 cd 같은 쉘 내장 명령어도 정상 작동합니다!
+
+      처음 사용시 Gemini API 키 설정이 필요합니다:
+        export GEMINI_API_KEY="your-api-key"
 
       Get your API key from: https://makersuite.google.com/app/apikey
     EOS
