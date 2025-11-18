@@ -11,8 +11,8 @@ clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 thiserror = "1.0"
 
-# 프로세스 실행
-tokio = { version = "1.40", features = ["process", "rt-multi-thread", "macros"] }
+# 프로세스 실행 및 비동기 I/O
+tokio = { version = "1.40", features = ["process", "rt-multi-thread", "macros", "net", "io-util", "sync"] }
 
 # 비동기 trait 지원
 async-trait = "0.1"

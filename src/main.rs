@@ -9,6 +9,7 @@ mod ui;
 mod config;
 mod context;
 mod cache;
+mod daemon;
 
 use cli::Cli;
 use error::Result;
@@ -53,6 +54,21 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    // --daemon-start 옵션 처리 (데몬 서버 시작)
+    if cli.daemon_start {
+        return start_daemon().await;
+    }
+
+    // --daemon-stop 옵션 처리 (데몬 서버 종료)
+    if cli.daemon_stop {
+        return stop_daemon().await;
+    }
+
+    // --daemon-status 옵션 처리 (데몬 서버 상태 확인)
+    if cli.daemon_status {
+        return check_daemon_status().await;
+    }
+
     // 설정 파일 로드 (없으면 기본값 사용)
     let config = Config::load().unwrap_or_default();
 
@@ -82,35 +98,91 @@ async fn main() -> Result<()> {
         println!("{} {}", "DEBUG Provider:".yellow(), provider_name);
     }
 
-    let provider = ProviderFactory::create(provider_name)?;
+    // 3-1. Daemon 모드 또는 일반 모드로 명령어 생성
+    let command = if cli.daemon {
+        // Daemon 모드: 데몬 서버에 요청
+        use daemon::protocol::{DaemonRequest, DaemonResponse};
+        use daemon::server::DaemonClient;
 
-    // 3-1. 캐시 확인 (--no-cache 플래그가 없으면)
-    let command = if !cli.no_cache {
-        let mut cache = RESPONSE_CACHE.lock().unwrap();
-        if let Some(cached_command) = cache.get(&cli.prompt_text(), &ctx) {
-            println!("{} 캐시에서 즉시 응답! (AI 호출 생략)", "⚡".green().bold());
-            cached_command
+        if !DaemonClient::is_running().await {
+            println!("{} 데몬 서버가 실행되고 있지 않습니다.", "⚠️".yellow());
+            println!("{} 데몬 모드로 실행하려면 먼저 데몬 서버를 시작하세요:", "💡".cyan());
+            println!("  {}", "askai --daemon-start".yellow());
+            println!("\n{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+            String::new() // 일반 모드로 fallback
         } else {
-            drop(cache); // lock 해제
+            let client = DaemonClient::default_client()?;
+            let request = DaemonRequest::GenerateCommand {
+                prompt: cli.prompt_text(),
+                context: ctx.clone(),
+                provider: provider_name.to_string(),
+            };
 
+            match client.send_request(&request).await {
+                Ok(DaemonResponse::Success { command, from_cache }) => {
+                    if from_cache {
+                        println!("{} 데몬 캐시에서 즉시 응답!", "⚡".green().bold());
+                    } else {
+                        println!("{} 데몬이 명령어를 생성했습니다.", "🤖".cyan());
+                    }
+                    // 명령어를 얻었으므로 이 블록의 결과로 사용
+                    command
+                }
+                Ok(DaemonResponse::Error { message }) => {
+                    println!("{} 데몬 에러: {}", "❌".red(), message);
+                    println!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                    // 일반 모드로 fallback
+                    String::new() // 임시값, 아래에서 덮어씀
+                }
+                Err(e) => {
+                    println!("{} 데몬 통신 에러: {}", "❌".red(), e);
+                    println!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                    String::new() // fallback
+                }
+                _ => {
+                    println!("{} 예상치 못한 응답", "⚠️".yellow());
+                    String::new()
+                }
+            }
+        }
+    } else {
+        String::new() // 일반 모드
+    };
+
+    // Daemon 모드에서 명령어를 얻지 못했거나 일반 모드인 경우
+    let command = if !cli.daemon || command.is_empty() {
+        let provider = ProviderFactory::create(provider_name)?;
+
+        // 캐시 확인 (--no-cache 플래그가 없으면)
+        if !cli.no_cache {
+            let mut cache = RESPONSE_CACHE.lock().unwrap();
+            if let Some(cached_command) = cache.get(&cli.prompt_text(), &ctx) {
+                println!("{} 캐시에서 즉시 응답! (AI 호출 생략)", "⚡".green().bold());
+                cached_command
+            } else {
+                drop(cache); // lock 해제
+
+                println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
+                         "🤖".cyan(),
+                         provider.name());
+
+                let generated_command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
+
+                // 캐시에 저장
+                let mut cache = RESPONSE_CACHE.lock().unwrap();
+                cache.set(&cli.prompt_text(), &ctx, generated_command.clone());
+
+                generated_command
+            }
+        } else {
+            // --no-cache: 캐시 무시하고 바로 생성
             println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
                      "🤖".cyan(),
                      provider.name());
-
-            let generated_command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
-
-            // 캐시에 저장
-            let mut cache = RESPONSE_CACHE.lock().unwrap();
-            cache.set(&cli.prompt_text(), &ctx, generated_command.clone());
-
-            generated_command
+            provider.generate_command(&cli.prompt_text(), &ctx).await?
         }
     } else {
-        // --no-cache: 캐시 무시하고 바로 생성
-        println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
-                 "🤖".cyan(),
-                 provider.name());
-        provider.generate_command(&cli.prompt_text(), &ctx).await?
+        command // daemon에서 얻은 명령어 사용
     };
 
     // 4. 안전성 검사
@@ -363,4 +435,91 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// 데몬 서버 시작
+async fn start_daemon() -> Result<()> {
+    use daemon::server::DaemonServer;
+
+    println!("{} 데몬 서버를 시작합니다...", "🚀".cyan().bold());
+
+    let server = DaemonServer::default_socket()?;
+
+    // Provider pre-warming
+    println!("\n{} Provider pre-warming...", "⚙️".cyan());
+    server.prewarm_providers(&["gemini"]).await?;
+
+    // 캐시 pre-warming
+    println!("\n{} 캐시 pre-warming...", "⚙️".cyan());
+    let ctx = context::get_current_context();
+    let count = server.prewarm_cache(&ctx).await;
+    println!("  {} {}개의 명령어를 캐시에 추가했습니다.", "✓".green(), count);
+
+    println!();
+
+    // 서버 실행 (blocking)
+    server.start().await?;
+
+    Ok(())
+}
+
+/// 데몬 서버 종료
+async fn stop_daemon() -> Result<()> {
+    use daemon::protocol::DaemonRequest;
+    use daemon::server::DaemonClient;
+
+    println!("{} 데몬 서버를 종료합니다...", "🛑".yellow());
+
+    let client = DaemonClient::default_client()?;
+    let request = DaemonRequest::Shutdown;
+
+    match client.send_request(&request).await {
+        Ok(_) => {
+            println!("{} 데몬 서버가 종료되었습니다.", "✅".green());
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 데몬 서버 종료 실패: {}", "❌".red(), e);
+            Err(e)
+        }
+    }
+}
+
+/// 데몬 서버 상태 확인
+async fn check_daemon_status() -> Result<()> {
+    use daemon::protocol::DaemonRequest;
+    use daemon::protocol::DaemonResponse;
+    use daemon::server::DaemonClient;
+
+    if !DaemonClient::is_running().await {
+        println!("{} 데몬 서버가 실행되고 있지 않습니다.", "❌".red());
+        println!("\n{} 데몬 서버를 시작하려면:", "💡".cyan());
+        println!("  {}", "askai --daemon-start".yellow());
+        return Ok(());
+    }
+
+    let client = DaemonClient::default_client()?;
+    let request = DaemonRequest::Ping;
+
+    match client.send_request(&request).await {
+        Ok(response) => match response {
+            DaemonResponse::Pong {
+                uptime_seconds,
+                session_count,
+            } => {
+                println!("{} 데몬 서버가 실행 중입니다.", "✅".green().bold());
+                println!("  ⏱️  Uptime: {}초", uptime_seconds);
+                println!("  📦 Loaded providers: {}", session_count);
+                Ok(())
+            }
+            _ => {
+                println!("{} 예상치 못한 응답", "⚠️".yellow());
+                Ok(())
+            }
+        },
+        Err(e) => {
+            println!("{} 데몬 서버 상태 확인 실패: {}", "❌".red(), e);
+            Err(e)
+        }
+    }
 }
