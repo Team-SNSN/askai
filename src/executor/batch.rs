@@ -1,6 +1,7 @@
 use crate::error::{AskAiError, Result};
 use crate::executor::planner::{ExecutionPlan, Task};
 use crate::executor::runner::CommandRunner;
+use crate::ui::BatchProgressDisplay;
 use colored::*;
 use std::time::Instant;
 
@@ -101,11 +102,8 @@ impl BatchExecutor {
         let start_time = Instant::now();
         let total = plan.task_count();
 
-        println!(
-            "{} {} 개의 작업 실행 중...",
-            "🚀".cyan(),
-            total.to_string().bold()
-        );
+        // 프로그레스 디스플레이 생성
+        let progress = BatchProgressDisplay::new(total, "배치 실행");
 
         let mut all_results = Vec::new();
 
@@ -113,27 +111,23 @@ impl BatchExecutor {
             // 병렬 실행
             let groups = plan.get_parallel_groups();
 
-            for (group_idx, group) in groups.iter().enumerate() {
-                println!(
-                    "\n{} 그룹 {} ({} 작업)",
-                    "📦".cyan(),
-                    group_idx + 1,
-                    group.len()
-                );
-
-                let group_results = self.execute_parallel(group).await;
+            for group in groups.iter() {
+                let group_results = self.execute_parallel_with_progress(group, &progress).await;
                 all_results.extend(group_results);
             }
         } else {
             // 순차 실행
             for task in &plan.tasks {
-                let result = self.execute_task(task).await;
+                let result = self.execute_task_with_progress(task, &progress).await;
                 all_results.push(result);
             }
         }
 
         let success_count = all_results.iter().filter(|r| r.success).count();
         let failure_count = all_results.iter().filter(|r| !r.success).count();
+
+        // 완료 메시지
+        progress.finish(success_count, total);
 
         let total_duration = start_time.elapsed().as_millis();
 
@@ -146,7 +140,36 @@ impl BatchExecutor {
         }
     }
 
-    /// 단일 작업 실행
+    /// 단일 작업 실행 (진행률 표시 포함)
+    async fn execute_task_with_progress(&self, task: &Task, progress: &BatchProgressDisplay) -> TaskResult {
+        let start_time = Instant::now();
+
+        // 작업 스피너 추가
+        let spinner = progress.add_task(&task.description);
+        spinner.set_message("실행 중...".to_string());
+
+        // working_dir이 있으면 cd를 포함한 명령어 생성
+        let command = if let Some(dir) = &task.working_dir {
+            format!("cd {} && {}", dir, task.command)
+        } else {
+            task.command.clone()
+        };
+
+        match self.runner.execute(&command).await {
+            Ok(output) => {
+                let duration = start_time.elapsed().as_millis();
+                progress.finish_task(&spinner, duration);
+                TaskResult::success(task, output, duration)
+            }
+            Err(e) => {
+                let duration = start_time.elapsed().as_millis();
+                progress.fail_task(&spinner, &e.to_string());
+                TaskResult::failure(task, e.to_string(), duration)
+            }
+        }
+    }
+
+    /// 단일 작업 실행 (구버전, 테스트용)
     async fn execute_task(&self, task: &Task) -> TaskResult {
         let start_time = Instant::now();
 
@@ -187,7 +210,66 @@ impl BatchExecutor {
         }
     }
 
-    /// 여러 작업 병렬 실행 (tokio::spawn 사용)
+    /// 여러 작업 병렬 실행 (진행률 표시 포함)
+    async fn execute_parallel_with_progress(&self, tasks: &[&Task], progress: &BatchProgressDisplay) -> Vec<TaskResult> {
+        use futures::future::join_all;
+        use std::sync::Arc;
+
+        let tasks_to_execute: Vec<_> = tasks.iter().map(|&t| t.clone()).collect();
+
+        // 각 task마다 스피너 생성
+        let spinners: Vec<_> = tasks_to_execute
+            .iter()
+            .map(|task| progress.add_task(&task.description))
+            .collect();
+
+        let handles: Vec<_> = tasks_to_execute
+            .into_iter()
+            .enumerate()
+            .map(|(idx, task)| {
+                let runner = CommandRunner::new();
+                let spinner = spinners[idx].clone();
+
+                tokio::spawn(async move {
+                    let start_time = Instant::now();
+
+                    spinner.set_message("실행 중...".to_string());
+
+                    // working_dir이 있으면 cd를 포함한 명령어 생성
+                    let command = if let Some(dir) = &task.working_dir {
+                        format!("cd {} && {}", dir, task.command)
+                    } else {
+                        task.command.clone()
+                    };
+
+                    let result = match runner.execute(&command).await {
+                        Ok(output) => {
+                            let duration = start_time.elapsed().as_millis();
+                            spinner.finish_with_message(format!("{} ({}ms)", "완료".green(), duration));
+                            TaskResult::success(&task, output, duration)
+                        }
+                        Err(e) => {
+                            let duration = start_time.elapsed().as_millis();
+                            spinner.finish_with_message(format!("{} {}", "실패".red(), e.to_string().dimmed()));
+                            TaskResult::failure(&task, e.to_string(), duration)
+                        }
+                    };
+
+                    result
+                })
+            })
+            .collect();
+
+        // 모든 작업이 완료될 때까지 대기
+        let results = join_all(handles).await;
+
+        results
+            .into_iter()
+            .filter_map(|r| r.ok())
+            .collect()
+    }
+
+    /// 여러 작업 병렬 실행 (tokio::spawn 사용, 구버전)
     async fn execute_parallel(&self, tasks: &[&Task]) -> Vec<TaskResult> {
         use futures::future::join_all;
 

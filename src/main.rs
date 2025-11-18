@@ -15,7 +15,7 @@ use cli::Cli;
 use error::Result;
 use ai::{factory::ProviderFactory, history::{CommandHistory, HistoryStore}};
 use executor::{CommandValidator, CommandRunner};
-use ui::ConfirmPrompt;
+use ui::{ConfirmPrompt, create_spinner};
 use chrono::Utc;
 use config::Config;
 use cache::ResponseCache;
@@ -162,11 +162,15 @@ async fn main() -> Result<()> {
             } else {
                 drop(cache); // lock 해제
 
-                println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
-                         "🤖".cyan(),
-                         provider.name());
+                let spinner = create_spinner(&format!(
+                    "{} provider로 명령어 생성 중...",
+                    provider.name()
+                ));
 
                 let generated_command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
+
+                spinner.finish_and_clear();
+                println!("{} 명령어 생성 완료!", "✓".green());
 
                 // 캐시에 저장
                 let mut cache = RESPONSE_CACHE.lock().unwrap();
@@ -176,10 +180,17 @@ async fn main() -> Result<()> {
             }
         } else {
             // --no-cache: 캐시 무시하고 바로 생성
-            println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
-                     "🤖".cyan(),
-                     provider.name());
-            provider.generate_command(&cli.prompt_text(), &ctx).await?
+            let spinner = create_spinner(&format!(
+                "{} provider로 명령어 생성 중...",
+                provider.name()
+            ));
+
+            let generated_command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
+
+            spinner.finish_and_clear();
+            println!("{} 명령어 생성 완료!", "✓".green());
+
+            generated_command
         }
     } else {
         command // daemon에서 얻은 명령어 사용
@@ -441,19 +452,22 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
 async fn start_daemon() -> Result<()> {
     use daemon::server::DaemonServer;
 
-    println!("{} 데몬 서버를 시작합니다...", "🚀".cyan().bold());
+    println!("{} 데몬 서버를 시작합니다...\n", "🚀".cyan().bold());
 
     let server = DaemonServer::default_socket()?;
 
     // Provider pre-warming
-    println!("\n{} Provider pre-warming...", "⚙️".cyan());
+    let spinner = create_spinner("Provider pre-warming 중...");
     server.prewarm_providers(&["gemini"]).await?;
+    spinner.finish_and_clear();
+    println!("{} Provider pre-warming 완료", "✓".green());
 
     // 캐시 pre-warming
-    println!("\n{} 캐시 pre-warming...", "⚙️".cyan());
+    let spinner = create_spinner("캐시 pre-warming 중...");
     let ctx = context::get_current_context();
     let count = server.prewarm_cache(&ctx).await;
-    println!("  {} {}개의 명령어를 캐시에 추가했습니다.", "✓".green(), count);
+    spinner.finish_and_clear();
+    println!("{} {}개의 명령어를 캐시에 추가했습니다.", "✓".green(), count);
 
     println!();
 
