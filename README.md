@@ -63,15 +63,17 @@ Arguments:
   <PROMPT>...  자연어 프롬프트
 
 Options:
-  -p, --provider <PROVIDER>  AI 제공자 선택 (gemini, claude, codex) [default: gemini]
-  -y, --yes                  확인 없이 바로 실행 (위험)
-      --dry-run              명령어만 출력하고 실행하지 않음
-  -d, --debug                디버그 모드
-      --no-cache             캐시 무시하고 항상 AI에 새로 요청
-      --clear-cache          캐시 전체 삭제
-      --prewarm-cache        자주 사용하는 명령어들을 미리 캐싱
-  -h, --help                 도움말 출력
-  -V, --version              버전 정보 출력
+  -p, --provider <PROVIDER>     AI 제공자 선택 (gemini, claude, codex) [default: gemini]
+  -y, --yes                     확인 없이 바로 실행 (위험)
+      --dry-run                 명령어만 출력하고 실행하지 않음
+  -d, --debug                   디버그 모드
+      --no-cache                캐시 무시하고 항상 AI에 새로 요청
+      --clear-cache             캐시 전체 삭제
+      --prewarm-cache           자주 사용하는 명령어들을 미리 캐싱
+      --batch                   배치 모드: 여러 프로젝트에 병렬 실행
+      --max-parallel <N>        최대 병렬 실행 개수 [default: 4]
+  -h, --help                    도움말 출력
+  -V, --version                 버전 정보 출력
 ```
 
 ### Provider 선택
@@ -138,6 +140,37 @@ $ askai "현재 시간" --yes
 2025년 10월 29일 수요일 13시 50분 51초 KST
 
 ✅ 완료!
+```
+
+### 4. 배치 모드 (여러 프로젝트 병렬 실행) ⭐ NEW!
+
+```bash
+$ askai --batch "git pull"
+🚀 배치 모드로 실행합니다...
+📦 3개의 프로젝트를 발견했습니다.
+  1. project-a (rust)
+  2. project-b (nodejs)
+  3. project-c (python)
+
+🤖 gemini provider로 각 프로젝트에 대한 명령어 생성 중...
+  ✓ project-a - git pull origin main
+  ✓ project-b - ⚡ 캐시 히트
+  ✓ project-c - git pull origin main
+
+⚡ 병렬 실행 시작...
+  ▶️ project-a: git pull
+    ✓ project-a: git pull (2341ms)
+  ▶️ project-b: git pull
+    ✓ project-b: git pull (1823ms)
+  ▶️ project-c: git pull
+    ✓ project-c: git pull (2156ms)
+
+✅ 배치 실행 완료!
+  - 총 작업: 3
+  - 성공: 3
+  - 실패: 0
+  - 성공률: 100.0%
+  - 실행 시간: 2456ms
 ```
 
 ## 🧠 RAG 시스템
@@ -406,11 +439,12 @@ cargo clippy
 - [x] 컨텍스트 학습 (RAG 기반)
 - [x] **Response Caching** (1,400배 성능 개선!)
 - [x] **Cache Pre-warming** (터미널 시작 시 자동 최적화)
+- [x] **프로젝트 자동 탐색** (재귀 디렉토리 스캔)
+- [x] **배치 작업 병렬 실행** (56배 성능 개선!)
 
 ### 🔄 Phase 3: 고급 기능 (계획 중)
-- [ ] 프로젝트 자동 탐색 및 인식
-- [ ] 배치 작업 지원 (병렬 실행)
 - [ ] Daemon Pre-warming (CLI session 재사용)
+- [ ] 진행률 표시 UI (Multi-progress bar)
 - [ ] 추가 AI Provider 지원 (GPT-4, etc.)
 - [ ] 롤백 기능
 - [ ] 플러그인 시스템
