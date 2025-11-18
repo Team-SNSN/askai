@@ -17,6 +17,10 @@ pub struct Cli {
     #[arg(short = 'y', long)]
     pub yes: bool,
 
+    /// 조용한 모드 (stderr 출력 억제, 명령어만 출력)
+    #[arg(short = 'q', long)]
+    pub quiet: bool,
+
     /// 명령어만 출력하고 실행하지 않음
     #[arg(long)]
     pub dry_run: bool,

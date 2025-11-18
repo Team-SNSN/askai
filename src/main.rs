@@ -85,16 +85,18 @@ async fn main() -> Result<()> {
     }
 
     // 1. 프롬프트 출력
-    eprintln!("{} {}", "🔍 프롬프트:".cyan(), cli.prompt_text());
+    if !cli.quiet {
+        eprintln!("{} {}", "🔍 프롬프트:".cyan(), cli.prompt_text());
+    }
 
     // 2. 컨텍스트 수집 (RAG: 관련 히스토리 포함)
     let ctx = context::get_context_with_history(&cli.prompt_text());
-    if cli.debug {
+    if cli.debug && !cli.quiet {
         eprintln!("{} {}", "DEBUG Context:".yellow(), ctx);
     }
 
     // 3. AI provider 선택 및 명령어 생성
-    if cli.debug {
+    if cli.debug && !cli.quiet {
         eprintln!("{} {}", "DEBUG Provider:".yellow(), provider_name);
     }
 
@@ -105,10 +107,12 @@ async fn main() -> Result<()> {
         use daemon::server::DaemonClient;
 
         if !DaemonClient::is_running().await {
-            eprintln!("{} 데몬 서버가 실행되고 있지 않습니다.", "⚠️".yellow());
-            eprintln!("{} 데몬 모드로 실행하려면 먼저 데몬 서버를 시작하세요:", "💡".cyan());
-            eprintln!("  {}", "askai --daemon-start".yellow());
-            eprintln!("\n{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+            if !cli.quiet {
+                eprintln!("{} 데몬 서버가 실행되고 있지 않습니다.", "⚠️".yellow());
+                eprintln!("{} 데몬 모드로 실행하려면 먼저 데몬 서버를 시작하세요:", "💡".cyan());
+                eprintln!("  {}", "askai --daemon-start".yellow());
+                eprintln!("\n{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+            }
             String::new() // 일반 모드로 fallback
         } else {
             let client = DaemonClient::default_client()?;
@@ -120,27 +124,35 @@ async fn main() -> Result<()> {
 
             match client.send_request(&request).await {
                 Ok(DaemonResponse::Success { command, from_cache }) => {
-                    if from_cache {
-                        eprintln!("{} 데몬 캐시에서 즉시 응답!", "⚡".green().bold());
-                    } else {
-                        eprintln!("{} 데몬이 명령어를 생성했습니다.", "🤖".cyan());
+                    if !cli.quiet {
+                        if from_cache {
+                            eprintln!("{} 데몬 캐시에서 즉시 응답!", "⚡".green().bold());
+                        } else {
+                            eprintln!("{} 데몬이 명령어를 생성했습니다.", "🤖".cyan());
+                        }
                     }
                     // 명령어를 얻었으므로 이 블록의 결과로 사용
                     command
                 }
                 Ok(DaemonResponse::Error { message }) => {
-                    eprintln!("{} 데몬 에러: {}", "❌".red(), message);
-                    eprintln!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                    if !cli.quiet {
+                        eprintln!("{} 데몬 에러: {}", "❌".red(), message);
+                        eprintln!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                    }
                     // 일반 모드로 fallback
                     String::new() // 임시값, 아래에서 덮어씀
                 }
                 Err(e) => {
-                    eprintln!("{} 데몬 통신 에러: {}", "❌".red(), e);
-                    eprintln!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                    if !cli.quiet {
+                        eprintln!("{} 데몬 통신 에러: {}", "❌".red(), e);
+                        eprintln!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                    }
                     String::new() // fallback
                 }
                 _ => {
-                    eprintln!("{} 예상치 못한 응답", "⚠️".yellow());
+                    if !cli.quiet {
+                        eprintln!("{} 예상치 못한 응답", "⚠️".yellow());
+                    }
                     String::new()
                 }
             }
@@ -157,20 +169,28 @@ async fn main() -> Result<()> {
         if !cli.no_cache {
             let mut cache = RESPONSE_CACHE.lock().unwrap();
             if let Some(cached_command) = cache.get(&cli.prompt_text(), &ctx) {
-                eprintln!("{} 캐시에서 즉시 응답! (AI 호출 생략)", "⚡".green().bold());
+                if !cli.quiet {
+                    eprintln!("{} 캐시에서 즉시 응답! (AI 호출 생략)", "⚡".green().bold());
+                }
                 cached_command
             } else {
                 drop(cache); // lock 해제
 
-                let spinner = create_spinner(&format!(
-                    "{} provider로 명령어 생성 중...",
-                    provider.name()
-                ));
+                let spinner = if !cli.quiet {
+                    create_spinner(&format!(
+                        "{} provider로 명령어 생성 중...",
+                        provider.name()
+                    ))
+                } else {
+                    create_spinner("")  // quiet 모드에서는 빈 spinner
+                };
 
                 let generated_command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
 
                 spinner.finish_and_clear();
-                eprintln!("{} 명령어 생성 완료!", "✓".green());
+                if !cli.quiet {
+                    eprintln!("{} 명령어 생성 완료!", "✓".green());
+                }
 
                 // 캐시에 저장
                 let mut cache = RESPONSE_CACHE.lock().unwrap();
@@ -180,15 +200,21 @@ async fn main() -> Result<()> {
             }
         } else {
             // --no-cache: 캐시 무시하고 바로 생성
-            let spinner = create_spinner(&format!(
-                "{} provider로 명령어 생성 중...",
-                provider.name()
-            ));
+            let spinner = if !cli.quiet {
+                create_spinner(&format!(
+                    "{} provider로 명령어 생성 중...",
+                    provider.name()
+                ))
+            } else {
+                create_spinner("")  // quiet 모드에서는 빈 spinner
+            };
 
             let generated_command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
 
             spinner.finish_and_clear();
-            eprintln!("{} 명령어 생성 완료!", "✓".green());
+            if !cli.quiet {
+                eprintln!("{} 명령어 생성 완료!", "✓".green());
+            }
 
             generated_command
         }
@@ -201,12 +227,18 @@ async fn main() -> Result<()> {
     let danger_level = validator.validate(&command)?;
 
     // 5. 사용자 확인 (--yes 플래그가 없으면)
-    if !cli.yes {
+    if !cli.yes && !cli.quiet {
         let prompt = ConfirmPrompt::new();
         if !prompt.confirm_execution(&command, danger_level)? {
             eprintln!("{}", "❌ 사용자가 취소했습니다.".yellow());
             return Ok(());
         }
+    } else if !cli.yes && cli.quiet {
+        // quiet 모드에서는 자동으로 yes로 처리 (위험할 수 있음)
+        // 또는 에러를 반환할 수도 있음
+        // 여기서는 안전을 위해 에러 반환
+        eprintln!("{}", "❌ quiet 모드에서는 --yes 플래그가 필요합니다.".red());
+        return Ok(());
     }
 
     // 6. 명령어를 stdout에 출력 (stderr에는 아무것도 출력하지 않음)
