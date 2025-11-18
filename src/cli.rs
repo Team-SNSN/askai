@@ -6,7 +6,7 @@ use clap::Parser;
 #[command(about = "AI-powered terminal automation", long_about = None)]
 pub struct Cli {
     /// 자연어 프롬프트
-    #[arg(required = true)]
+    #[arg(required_unless_present_any = ["clear_cache", "prewarm_cache"])]
     pub prompt: Vec<String>,
 
     /// AI 제공자 선택 (gemini, claude, codex). 미지정시 설정 파일의 default_provider 사용
@@ -24,6 +24,18 @@ pub struct Cli {
     /// 디버그 모드
     #[arg(short = 'd', long)]
     pub debug: bool,
+
+    /// 캐시 무시하고 항상 AI에 새로 요청
+    #[arg(long)]
+    pub no_cache: bool,
+
+    /// 캐시 전체 삭제
+    #[arg(long)]
+    pub clear_cache: bool,
+
+    /// 자주 사용하는 명령어들을 미리 캐싱 (터미널 시작 시 권장)
+    #[arg(long)]
+    pub prewarm_cache: bool,
 
     /// 배치 모드: 여러 디렉토리에서 같은 명령어 실행 (Phase 3용)
     #[arg(long)]

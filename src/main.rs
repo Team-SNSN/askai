@@ -8,6 +8,7 @@ mod executor;
 mod ui;
 mod config;
 mod context;
+mod cache;
 
 use cli::Cli;
 use error::Result;
@@ -16,10 +17,41 @@ use executor::{CommandValidator, CommandRunner};
 use ui::ConfirmPrompt;
 use chrono::Utc;
 use config::Config;
+use cache::ResponseCache;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+
+// 전역 Response Cache (프로그램 전체에서 재사용)
+static RESPONSE_CACHE: Lazy<Mutex<ResponseCache>> = Lazy::new(|| {
+    Mutex::new(
+        ResponseCache::default_config()
+            .expect("Failed to initialize response cache")
+    )
+});
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // --clear-cache 옵션 처리 (우선 처리)
+    if cli.clear_cache {
+        let mut cache = RESPONSE_CACHE.lock().unwrap();
+        cache.clear()?;
+        println!("{} 캐시가 삭제되었습니다.", "✅".green());
+        return Ok(());
+    }
+
+    // --prewarm-cache 옵션 처리
+    if cli.prewarm_cache {
+        let ctx = context::get_current_context();
+        let mut cache = RESPONSE_CACHE.lock().unwrap();
+        let count = cache.prewarm(&ctx);
+        cache.save_to_disk()?;
+        println!("{} {}개의 자주 사용하는 명령어를 캐시에 추가했습니다.", "✅".green(), count);
+        println!("{} 터미널 시작 시 이 명령어를 실행하면 더 빠른 응답을 받을 수 있습니다:", "💡".cyan());
+        println!("  {}", "echo 'askai --prewarm-cache &' >> ~/.zshrc".yellow());
+        return Ok(());
+    }
 
     // 설정 파일 로드 (없으면 기본값 사용)
     let config = Config::load().unwrap_or_default();
@@ -47,11 +79,34 @@ async fn main() -> Result<()> {
 
     let provider = ProviderFactory::create(provider_name)?;
 
-    println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
-             "🤖".cyan(),
-             provider.name());
+    // 3-1. 캐시 확인 (--no-cache 플래그가 없으면)
+    let command = if !cli.no_cache {
+        let mut cache = RESPONSE_CACHE.lock().unwrap();
+        if let Some(cached_command) = cache.get(&cli.prompt_text(), &ctx) {
+            println!("{} 캐시에서 즉시 응답! (AI 호출 생략)", "⚡".green().bold());
+            cached_command
+        } else {
+            drop(cache); // lock 해제
 
-    let command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
+            println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
+                     "🤖".cyan(),
+                     provider.name());
+
+            let generated_command = provider.generate_command(&cli.prompt_text(), &ctx).await?;
+
+            // 캐시에 저장
+            let mut cache = RESPONSE_CACHE.lock().unwrap();
+            cache.set(&cli.prompt_text(), &ctx, generated_command.clone());
+
+            generated_command
+        }
+    } else {
+        // --no-cache: 캐시 무시하고 바로 생성
+        println!("{} {} provider를 사용하여 명령어를 생성하는 중...",
+                 "🤖".cyan(),
+                 provider.name());
+        provider.generate_command(&cli.prompt_text(), &ctx).await?
+    };
 
     // 4. 안전성 검사
     let validator = CommandValidator::new();
@@ -80,6 +135,13 @@ async fn main() -> Result<()> {
             provider: provider_name.to_string(),
         };
         let _ = store.add(history_entry); // 실패해도 무시
+
+        // 캐시를 디스크에 저장 (dry-run도 캐시 활용)
+        if let Err(e) = RESPONSE_CACHE.lock().unwrap().save_to_disk() {
+            if cli.debug {
+                println!("{} 캐시 저장 실패: {}", "DEBUG:".yellow(), e);
+            }
+        }
 
         return Ok(());
     } else {
@@ -114,6 +176,13 @@ async fn main() -> Result<()> {
     execution_result?;
 
     println!("\n{}", "✅ 완료!".green().bold());
+
+    // 캐시를 디스크에 저장
+    if let Err(e) = RESPONSE_CACHE.lock().unwrap().save_to_disk() {
+        if cli.debug {
+            println!("{} 캐시 저장 실패: {}", "DEBUG:".yellow(), e);
+        }
+    }
 
     Ok(())
 }
