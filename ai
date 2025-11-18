@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# askai wrapper script - 현재 터미널 세션에서 명령어 실행
+#
+# 사용법:
+#   ai "현재 시간"
+#   ai "src 디렉토리로 이동"
+#
+# 설치:
+#   1. 이 파일을 PATH에 있는 디렉토리로 복사 (예: /usr/local/bin/ai)
+#   2. 실행 권한 부여: chmod +x /usr/local/bin/ai
+
+# askai 바이너리 경로 (필요시 수정)
+# 개발 중인 경로를 우선적으로 사용
+if [ -f "/Users/ys/Code/askai/target/debug/askai" ]; then
+    ASKAI_BIN="/Users/ys/Code/askai/target/debug/askai"
+elif [ -f "/Users/ys/Code/askai/target/release/askai" ]; then
+    ASKAI_BIN="/Users/ys/Code/askai/target/release/askai"
+elif command -v askai &> /dev/null; then
+    ASKAI_BIN="askai"
+else
+    echo "❌ askai를 찾을 수 없습니다. 먼저 빌드해주세요." >&2
+    echo "   cargo build --path /Users/ys/Code/askai" >&2
+    exit 1
+fi
+
+# 인자가 없으면 도움말 출력
+if [ $# -eq 0 ]; then
+    echo "사용법: ai \"자연어 명령어\"" >&2
+    echo "예시:" >&2
+    echo "  ai \"현재 시간\"" >&2
+    echo "  ai \"src 디렉토리로 이동\"" >&2
+    echo "  ai \"모든 git 프로젝트 pull\"" >&2
+    exit 1
+fi
+
+# askai를 실행하고 결과를 eval로 실행
+# --quiet: quiet 모드 (stderr 출력 억제)
+# --yes: 자동 승인 (Y/n 프롬프트 건너뛰기)
+cmd=$($ASKAI_BIN --quiet --yes "$@")
+
+if [ $? -eq 0 ] && [ -n "$cmd" ]; then
+    # 명령어 실행
+    eval "$cmd"
+else
+    # 에러 발생 또는 빈 명령어
+    exit $?
+fi
