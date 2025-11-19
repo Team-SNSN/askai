@@ -75,8 +75,8 @@ impl ProviderFactory {
             "codex" => Ok(Arc::new(CodexProvider::new())),
             _ => Err(AskAiError::AiCliError(
                 format!(
-                    "알 수 없는 AI provider: {}\n\
-                     지원되는 provider: gemini, claude, codex",
+                    "Unknown AI provider: {}\n\
+                     Supported providers: gemini, claude, codex",
                     provider_name
                 )
             )),

@@ -2,39 +2,39 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AskAiError {
-    #[error("AI CLI 실행 실패: {0}")]
+    #[error("Failed to execute AI CLI: {0}")]
     AiCliError(String),
 
-    #[error("위험한 명령어 감지: {0}")]
+    #[error("Dangerous command detected: {0}")]
     DangerousCommand(String),
 
-    #[error("명령어 실행 실패: {0}")]
+    #[error("Command execution failed: {0}")]
     ExecutionError(String),
 
-    #[error("사용자 취소")]
+    #[error("User cancelled")]
     UserCancelled,
 
-    #[error("IO 에러: {0}")]
+    #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
-    #[error("JSON 직렬화/역직렬화 에러: {0}")]
+    #[error("JSON serialization/deserialization error: {0}")]
     JsonError(#[from] serde_json::Error),
 
-    // Phase 2 추가 에러 타입
-    #[error("프로젝트 타입 감지 실패: {0}")]
+    // Phase 2 error types
+    #[error("Project type detection failed: {0}")]
     ProjectDetectionError(String),
 
-    #[error("배치 실행 부분 실패: {success}/{total} 성공")]
+    #[error("Batch execution partially failed: {success}/{total} succeeded")]
     BatchPartialFailure {
         success: usize,
         total: usize,
         errors: Vec<String>,
     },
 
-    #[error("설정 파일 오류: {0}")]
+    #[error("Configuration error: {0}")]
     ConfigError(String),
 
-    #[error("병렬 실행 오류: {0}")]
+    #[error("Parallel execution error: {0}")]
     ParallelExecutionError(String),
 }
 
