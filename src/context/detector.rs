@@ -113,7 +113,6 @@ impl ProjectDetector {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
 
     #[test]
     fn test_extract_toml_value() {

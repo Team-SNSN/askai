@@ -2,12 +2,7 @@ pub mod runner;
 pub mod validator;
 pub mod planner;
 pub mod batch;
+pub mod rollback;
 
-pub use runner::CommandRunner;
-pub use validator::CommandValidator;
-pub use planner::{ExecutionPlan, ExecutionPlanner, Task};
-pub use batch::{BatchExecutor, BatchResult, TaskResult};
-
-// DangerLevel은 ui 모듈에서 사용됨
-#[allow(unused_imports)]
-pub use validator::DangerLevel;
+// Re-exports for convenience (used in main.rs and ui module)
+pub use validator::{CommandValidator, DangerLevel};

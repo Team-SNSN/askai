@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_keyword_matching() {
-        let store = HistoryStore::new();
+        let _store = HistoryStore::new();
 
         // 테스트용 히스토리 생성
         let history = vec![

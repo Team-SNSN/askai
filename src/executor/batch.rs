@@ -1,4 +1,4 @@
-use crate::error::{AskAiError, Result};
+// Executor batch module - handles parallel execution of tasks
 use crate::executor::planner::{ExecutionPlan, Task};
 use crate::executor::runner::CommandRunner;
 use crate::ui::BatchProgressDisplay;
@@ -87,6 +87,8 @@ pub struct BatchExecutor {
     max_parallel: usize,
     /// 실행기
     runner: CommandRunner,
+    /// Dry-run 모드
+    dry_run: bool,
 }
 
 impl BatchExecutor {
@@ -94,7 +96,14 @@ impl BatchExecutor {
         Self {
             max_parallel,
             runner: CommandRunner::new(),
+            dry_run: false,
         }
+    }
+
+    pub fn with_dry_run(mut self, dry_run: bool) -> Self {
+        self.dry_run = dry_run;
+        self.runner = CommandRunner::new().with_dry_run(dry_run);
+        self
     }
 
     /// 실행 계획에 따라 배치 실행
@@ -169,51 +178,9 @@ impl BatchExecutor {
         }
     }
 
-    /// 단일 작업 실행 (구버전, 테스트용)
-    async fn execute_task(&self, task: &Task) -> TaskResult {
-        let start_time = Instant::now();
-
-        println!(
-            "  {} {}",
-            "[>]".cyan(),
-            task.description.dimmed()
-        );
-
-        // working_dir이 있으면 cd를 포함한 명령어 생성
-        let command = if let Some(dir) = &task.working_dir {
-            format!("cd {} && {}", dir, task.command)
-        } else {
-            task.command.clone()
-        };
-
-        match self.runner.execute(&command).await {
-            Ok(output) => {
-                let duration = start_time.elapsed().as_millis();
-                println!(
-                    "    {} {} ({}ms)",
-                    "[v]".green(),
-                    task.description,
-                    duration
-                );
-                TaskResult::success(task, output, duration)
-            }
-            Err(e) => {
-                let duration = start_time.elapsed().as_millis();
-                println!(
-                    "    {} {} - {}",
-                    "✗".red(),
-                    task.description,
-                    e.to_string().red()
-                );
-                TaskResult::failure(task, e.to_string(), duration)
-            }
-        }
-    }
-
     /// 여러 작업 병렬 실행 (진행률 표시 포함)
     async fn execute_parallel_with_progress(&self, tasks: &[&Task], progress: &BatchProgressDisplay) -> Vec<TaskResult> {
         use futures::future::join_all;
-        use std::sync::Arc;
 
         let tasks_to_execute: Vec<_> = tasks.iter().map(|&t| t.clone()).collect();
 
@@ -256,67 +223,6 @@ impl BatchExecutor {
                     };
 
                     result
-                })
-            })
-            .collect();
-
-        // 모든 작업이 완료될 때까지 대기
-        let results = join_all(handles).await;
-
-        results
-            .into_iter()
-            .filter_map(|r| r.ok())
-            .collect()
-    }
-
-    /// 여러 작업 병렬 실행 (tokio::spawn 사용, 구버전)
-    async fn execute_parallel(&self, tasks: &[&Task]) -> Vec<TaskResult> {
-        use futures::future::join_all;
-
-        let tasks_to_execute: Vec<_> = tasks.iter().map(|&t| t.clone()).collect();
-
-        let handles: Vec<_> = tasks_to_execute
-            .into_iter()
-            .map(|task| {
-                let runner = CommandRunner::new();
-                tokio::spawn(async move {
-                    let start_time = Instant::now();
-
-                    println!(
-                        "  {} {}",
-                        "[>]".cyan(),
-                        task.description.dimmed()
-                    );
-
-                    // working_dir이 있으면 cd를 포함한 명령어 생성
-                    let command = if let Some(dir) = &task.working_dir {
-                        format!("cd {} && {}", dir, task.command)
-                    } else {
-                        task.command.clone()
-                    };
-
-                    match runner.execute(&command).await {
-                        Ok(output) => {
-                            let duration = start_time.elapsed().as_millis();
-                            println!(
-                                "    {} {} ({}ms)",
-                                "[v]".green(),
-                                task.description,
-                                duration
-                            );
-                            TaskResult::success(&task, output, duration)
-                        }
-                        Err(e) => {
-                            let duration = start_time.elapsed().as_millis();
-                            println!(
-                                "    {} {} - {}",
-                                "✗".red(),
-                                task.description,
-                                e.to_string().red()
-                            );
-                            TaskResult::failure(&task, e.to_string(), duration)
-                        }
-                    }
                 })
             })
             .collect();

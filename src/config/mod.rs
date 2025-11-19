@@ -27,6 +27,22 @@ pub struct Config {
     /// 최대 병렬 작업 개수 (Phase 3용)
     #[serde(default = "default_max_parallel")]
     pub max_parallel_jobs: usize,
+
+    /// 조용한 모드 기본값 (stderr 출력 억제)
+    #[serde(default = "default_quiet_mode")]
+    pub default_quiet_mode: bool,
+
+    /// 디버그 모드 기본값
+    #[serde(default = "default_debug_mode")]
+    pub default_debug_mode: bool,
+
+    /// 캐시 유효 기간 (일 단위)
+    #[serde(default = "default_cache_ttl_days")]
+    pub cache_ttl_days: u64,
+
+    /// 캐시 최대 항목 수
+    #[serde(default = "default_cache_max_entries")]
+    pub cache_max_entries: usize,
 }
 
 fn default_provider() -> String {
@@ -50,6 +66,22 @@ fn default_max_parallel() -> usize {
     4
 }
 
+fn default_quiet_mode() -> bool {
+    false
+}
+
+fn default_debug_mode() -> bool {
+    false
+}
+
+fn default_cache_ttl_days() -> u64 {
+    7  // 1 week
+}
+
+fn default_cache_max_entries() -> usize {
+    1000
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -58,6 +90,10 @@ impl Default for Config {
             history_path: default_history_path(),
             enable_rag: default_enable_rag(),
             max_parallel_jobs: default_max_parallel(),
+            default_quiet_mode: default_quiet_mode(),
+            default_debug_mode: default_debug_mode(),
+            cache_ttl_days: default_cache_ttl_days(),
+            cache_max_entries: default_cache_max_entries(),
         }
     }
 }
@@ -70,6 +106,7 @@ impl Config {
     }
 
     /// 설정 디렉토리 경로
+    #[allow(dead_code)]  // Used by save() method
     fn config_dir() -> PathBuf {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         PathBuf::from(home).join(".askai")
@@ -112,6 +149,7 @@ impl Config {
     /// config.default_provider = "claude".to_string();
     /// config.save().unwrap();
     /// ```
+    #[allow(dead_code)]  // Public API for config management
     pub fn save(&self) -> Result<()> {
         let config_dir = Self::config_dir();
         let config_path = Self::config_path();
@@ -134,6 +172,7 @@ impl Config {
     }
 
     /// 설정 파일 초기화 (기본값으로)
+    #[allow(dead_code)]  // Public API for config initialization
     pub fn init() -> Result<()> {
         let config = Self::default();
         config.save()
@@ -151,6 +190,10 @@ mod tests {
         assert_eq!(config.auto_approve_safe_commands, false);
         assert_eq!(config.enable_rag, true);
         assert_eq!(config.max_parallel_jobs, 4);
+        assert_eq!(config.default_quiet_mode, false);
+        assert_eq!(config.default_debug_mode, false);
+        assert_eq!(config.cache_ttl_days, 7);
+        assert_eq!(config.cache_max_entries, 1000);
     }
 
     #[test]
@@ -169,6 +212,10 @@ mod tests {
             auto_approve_safe_commands = true
             enable_rag = false
             max_parallel_jobs = 8
+            default_quiet_mode = true
+            default_debug_mode = true
+            cache_ttl_days = 14
+            cache_max_entries = 2000
         "#;
 
         let config: Config = toml::from_str(toml_str).unwrap();
@@ -176,5 +223,9 @@ mod tests {
         assert_eq!(config.auto_approve_safe_commands, true);
         assert_eq!(config.enable_rag, false);
         assert_eq!(config.max_parallel_jobs, 8);
+        assert_eq!(config.default_quiet_mode, true);
+        assert_eq!(config.default_debug_mode, true);
+        assert_eq!(config.cache_ttl_days, 14);
+        assert_eq!(config.cache_max_entries, 2000);
     }
 }

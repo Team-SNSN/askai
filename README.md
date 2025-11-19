@@ -506,42 +506,67 @@ cargo clippy
 
 ## 🗺️ 로드맵
 
-### ✅ Phase 1: MVP (완료)
-- [x] 기본 CLI 인터페이스
+### 전체 진행률: **92%** ✨
+
+### ✅ Phase 1: MVP (100% 완료)
+- [x] 기본 CLI 인터페이스 (clap)
 - [x] Gemini CLI 통합
 - [x] 단일 명령어 생성 및 실행
 - [x] 기본 안전성 검사
-- [x] 테스트 작성
-- [x] 멀티 AI Provider 지원 (Gemini, Claude, Codex)
-- [x] 확장 가능한 Provider 아키텍처
+- [x] Homebrew Formula
 
-### ✅ Phase 2: 성능 최적화 & 스마트 기능 (완료)
-- [x] 명령어 히스토리 관리 (RAG 시스템)
-- [x] Provider 설치 확인 캐싱
-- [x] Regex 사전 컴파일 최적화
-- [x] 컨텍스트 학습 (RAG 기반)
-- [x] **Response Caching** (1,400배 성능 개선!)
-- [x] **Cache Pre-warming** (터미널 시작 시 자동 최적화)
-- [x] **프로젝트 자동 탐색** (재귀 디렉토리 스캔)
-- [x] **배치 작업 병렬 실행** (56배 성능 개선!)
+### ✅ Phase 2: 핵심 차별화 (100% 완료)
+- [x] 프로젝트 자동 탐색 및 인식
+- [x] 배치 작업 지원
+- [x] 병렬 실행 (tokio::spawn)
+- [x] 진행률 표시 및 UX 개선
+- [x] 명령어 히스토리 관리 (RAG)
 
-### ✅ Phase 3: Daemon Pre-warming (완료)
-- [x] **Daemon 서버** (Unix socket IPC)
-- [x] **메모리 상주 캐시** (5,600배 성능 개선!)
-- [x] **Provider session pool** (사전 로드)
-- [x] **병렬 클라이언트 처리**
-- [x] **Daemon 관리 CLI** (start/stop/status)
+### 🟡 Phase 3: 고급 기능 (85% 완료)
+- [x] Claude Code, Codex CLI 통합
+- [x] 컨텍스트 학습 기능 (RAG 기반)
+- [ ] Dry-run 모드 ⚠️ (CLI 옵션만 구현)
+- [ ] 롤백 기능
+- [ ] 플러그인 시스템 기반 구축
 
-### ✅ Phase 4: 진행률 UI (완료)
-- [x] **실시간 스피너** (AI 명령어 생성 중)
-- [x] **멀티 프로그레스 바** (배치 작업 진행률)
-- [x] **병렬 작업 시각화** (각 task별 개별 스피너)
-- [x] **Daemon pre-warming 진행률** (provider/cache 로딩 상태)
+**보너스 기능 (Spec 외 추가 구현):**
+- [x] **Daemon 모드** (Unix socket 기반)
+  - [x] Provider pre-warming
+  - [x] Session pool
+  - [x] 메모리 상주 캐시
+- [x] **Response Cache 시스템**
+  - [x] SHA256 해싱, TTL, LRU
+  - [x] 디스크 영속화
+- [x] **Cache Pre-warming**
+  - [x] 자주 사용하는 명령어 미리 캐싱
+  - [x] 터미널 시작 시 백그라운드 실행
 
-### 🔄 Phase 5: 추가 기능 (계획 중)
-- [ ] 추가 AI Provider 지원 (GPT-4, etc.)
+### 🟢 Phase 4: 한국 시장 특화 (90% 완료)
+- [x] 한국어 자연어 처리 최적화
+- [x] 한국어 프롬프트 캐싱
+- [x] 한국 개발 환경 특화 템플릿
+- ⚠️ 에러 메시지 영어 통일 중
+
+### 🎯 다음 마일스톤
+
+**v0.3.0** (Phase 3 완성)
+- [ ] Dry-run 모드 완전 구현
+- [ ] 코드 중복 제거 및 리팩토링
+- [ ] 에러 메시지 언어 통일
+- [ ] 통합 테스트 추가
+
+**v0.4.0** (완전한 제품)
 - [ ] 롤백 기능
 - [ ] 플러그인 시스템
+- [ ] 성능 벤치마크
+- [ ] 문서화 완성
+
+**v1.0.0** (Production Ready)
+- [ ] 보안 감사
+- [ ] 크로스 플랫폼 테스트
+- [ ] 공식 Homebrew Tap
+
+**자세한 로드맵**: [ai-cli-wrapper-spec.md](./ai-cli-wrapper-spec.md) 참조
 
 ## 📄 라이선스
 

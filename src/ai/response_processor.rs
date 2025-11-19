@@ -44,8 +44,8 @@ impl ResponseProcessor {
             if command.to_lowercase().contains(&pattern.to_lowercase()) {
                 return Err(AskAiError::AiCliError(
                     format!(
-                        "AI가 명령어 대신 설명을 반환했습니다: {}\n\
-                         프롬프트를 더 명확하게 작성하거나 다시 시도해주세요.",
+                        "AI returned an explanation instead of a command: {}\n\
+                         Please try again with a clearer prompt.",
                         command
                     )
                 ));
@@ -107,7 +107,7 @@ impl ResponseProcessor {
         // 6. 빈 명령어 체크
         if command.is_empty() {
             return Err(AskAiError::AiCliError(
-                "AI가 빈 명령어를 반환했습니다. 다시 시도해주세요.".to_string()
+                "AI returned an empty command. Please try again.".to_string()
             ));
         }
 

@@ -25,8 +25,8 @@ impl AiProvider for GeminiProvider {
         // 캐싱된 설치 확인 사용 (성능 최적화)
         ProviderFactory::check_installation(
             self.cli_command(),
-            "Gemini CLI가 설치되어 있지 않습니다.\n\
-             설치 방법: npm install -g @google/generative-ai-cli"
+            "Gemini CLI is not installed.\n\
+             Installation: npm install -g @google/generative-ai-cli"
         ).await
     }
 
