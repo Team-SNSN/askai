@@ -2,7 +2,7 @@ use crate::cli::Cli;
 use crate::config::Config;
 use crate::error::Result;
 use crate::ai::factory::ProviderFactory;
-use crate::context::{ProjectScanner, ScanResult};
+use crate::context::{ProjectScanner, ScanResult, ProjectType};
 use crate::executor::{planner::{ExecutionPlan, Task}, batch::BatchExecutor, DangerLevel};
 use crate::ui::ConfirmPrompt;
 use colored::*;
@@ -28,7 +28,32 @@ pub async fn execute_batch_mode(cli: &Cli, config: &Config, response_cache: &Laz
     };
 
     let current_dir = env::current_dir()?;
-    let scan_result: ScanResult = scanner.scan(&current_dir);
+    let mut scan_result: ScanResult = scanner.scan(&current_dir);
+
+    // 프로젝트 타입 필터링 (--project-type 옵션이 있으면)
+    if let Some(project_type_str) = &cli.project_type {
+        let project_type = ProjectType::from_str(project_type_str);
+        let original_count = scan_result.projects.len();
+
+        scan_result.projects.retain(|p| p.has_type(&project_type));
+
+        if scan_result.projects.is_empty() {
+            eprintln!("{} No {} projects found (scanned {} total).",
+                "[X]".red(),
+                project_type.as_str().yellow(),
+                original_count
+            );
+            return Ok(());
+        }
+
+        eprintln!(
+            "{} Filtered to {} {} projects (from {} total).",
+            "[FILTER]".cyan(),
+            scan_result.projects.len().to_string().bold(),
+            project_type.as_str().yellow(),
+            original_count
+        );
+    }
 
     if scan_result.projects.is_empty() {
         eprintln!("{} No projects found.", "[X]".red());
