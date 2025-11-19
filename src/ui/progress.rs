@@ -54,12 +54,12 @@ impl MultiProgressDisplay {
 
     /// 완료 메시지와 함께 스피너 종료
     pub fn finish_spinner(&self, spinner: &ProgressBar, message: &str) {
-        spinner.finish_with_message(format!("{} {}", "✓".green(), message));
+        spinner.finish_with_message(format!("{} {}", "[v]".green(), message));
     }
 
     /// 에러 메시지와 함께 스피너 종료
     pub fn fail_spinner(&self, spinner: &ProgressBar, message: &str) {
-        spinner.finish_with_message(format!("{} {}", "✗".red(), message));
+        spinner.finish_with_message(format!("{} {}", "[x]".red(), message));
     }
 }
 
@@ -108,13 +108,13 @@ impl BatchProgressDisplay {
 
     /// 작업 성공 완료
     pub fn finish_task(&self, spinner: &ProgressBar, duration_ms: u128) {
-        spinner.finish_with_message(format!("{} ({}ms)", "완료".green(), duration_ms));
+        spinner.finish_with_message(format!("{} ({}ms)", "Complete".green(), duration_ms));
         self.main_bar.inc(1);
     }
 
     /// 작업 실패
     pub fn fail_task(&self, spinner: &ProgressBar, error: &str) {
-        spinner.finish_with_message(format!("{} {}", "실패".red(), error.dimmed()));
+        spinner.finish_with_message(format!("{} {}", "Failed".red(), error.dimmed()));
         self.main_bar.inc(1);
     }
 
@@ -122,8 +122,8 @@ impl BatchProgressDisplay {
     pub fn finish(&self, success: usize, total: usize) {
         self.main_bar.finish_with_message(
             format!(
-                "{} 완료 (성공: {}, 실패: {})",
-                "✓".green().bold(),
+                "{} Complete (Success: {}, Failed: {})",
+                "[v]".green().bold(),
                 success.to_string().green(),
                 (total - success).to_string().red()
             )
@@ -164,6 +164,6 @@ mod tests {
     fn test_multi_progress_display() {
         let display = MultiProgressDisplay::new();
         let spinner = display.add_spinner("테스트");
-        display.finish_spinner(&spinner, "완료");
+        display.finish_spinner(&spinner, "Complete");
     }
 }

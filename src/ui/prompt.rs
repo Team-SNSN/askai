@@ -11,7 +11,8 @@ impl ConfirmPrompt {
     }
 
     pub fn confirm_execution(&self, command: &str, danger_level: DangerLevel) -> Result<bool> {
-        println!("\n{}", "📋 생성된 명령어:".cyan().bold());
+        // Output to stderr to avoid passing to eval
+        eprintln!("\n{}", "[>] Generated command:".cyan().bold());
 
         let colored_command = match danger_level {
             DangerLevel::Low => command.green(),
@@ -19,18 +20,18 @@ impl ConfirmPrompt {
             DangerLevel::High => command.red().bold(),
         };
 
-        println!("  {}", colored_command);
+        eprintln!("  {}", colored_command);
 
-        let danger_msg = match danger_level {
-            DangerLevel::Low => "",
-            DangerLevel::Medium => " ⚠️  (주의 필요)",
-            DangerLevel::High => " 🚨 (매우 위험)",
+        let (danger_msg, danger_level_str) = match danger_level {
+            DangerLevel::Low => ("Low".green(), "[*] Safe"),
+            DangerLevel::Medium => ("Medium".yellow(), "[!] Caution"),
+            DangerLevel::High => ("High".red().bold(), "[!!!] Very dangerous"),
         };
 
-        println!("\n{}{}", "위험도:".bold(), danger_msg);
+        eprintln!("\n{} {} - {}", "Risk level:".bold(), danger_msg, danger_level_str);
 
         let result = Confirm::new()
-            .with_prompt("이 명령어를 실행하시겠습니까?")
+            .with_prompt("Execute this command?")
             .default(false)
             .interact()
             .map_err(|_| AskAiError::UserCancelled)?;
