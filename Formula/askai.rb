@@ -41,15 +41,27 @@ class Askai < Formula
           exit 1
       fi
 
-      # 명령어 생성
-      cmd=$("$ASKAI_BIN" --quiet --yes "$@" 2>/dev/null)
+      # 명령어 생성 (사용자 확인 프롬프트 표시)
+      # 임시 파일을 사용하여 명령어 저장
+      TEMP_FILE=$(mktemp /tmp/askai.XXXXXX)
 
-      if [ $? -eq 0 ] && [ -n "$cmd" ]; then
-          # 명령어 실행 (eval 사용)
-          eval "$cmd"
+      # 바이너리 실행 (사용자 확인 포함, stdin/stdout/stderr 모두 연결)
+      "$ASKAI_BIN" "$@" > "$TEMP_FILE"
+      exit_code=$?
+
+      if [ $exit_code -eq 0 ]; then
+          # 사용자가 승인한 경우 명령어 읽기 및 실행
+          cmd=$(cat "$TEMP_FILE")
+          rm -f "$TEMP_FILE"
+
+          if [ -n "$cmd" ]; then
+              # 명령어 실행 (eval 사용)
+              eval "$cmd"
+          fi
       else
-          # 에러 발생시 일반 모드로 실행
-          exec "$ASKAI_BIN" "$@"
+          # 사용자가 취소했거나 에러가 발생한 경우
+          rm -f "$TEMP_FILE"
+          exit $exit_code
       fi
     EOS
   end
