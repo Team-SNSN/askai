@@ -120,7 +120,7 @@ impl ProjectScanner {
 
 impl Default for ProjectScanner {
     fn default() -> Self {
-        Self::default()
+        Self::new(3)  // Default max depth of 3
     }
 }
 
