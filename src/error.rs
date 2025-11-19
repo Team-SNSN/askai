@@ -22,9 +22,11 @@ pub enum AskAiError {
 
     // Phase 2 error types
     #[error("Project type detection failed: {0}")]
+    #[allow(dead_code)]  // Reserved for future project detection errors
     ProjectDetectionError(String),
 
     #[error("Batch execution partially failed: {success}/{total} succeeded")]
+    #[allow(dead_code)]  // Reserved for partial batch failures
     BatchPartialFailure {
         success: usize,
         total: usize,
@@ -35,6 +37,7 @@ pub enum AskAiError {
     ConfigError(String),
 
     #[error("Parallel execution error: {0}")]
+    #[allow(dead_code)]  // Reserved for parallel execution errors
     ParallelExecutionError(String),
 }
 

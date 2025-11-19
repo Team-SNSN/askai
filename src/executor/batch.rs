@@ -1,4 +1,4 @@
-use crate::error::{AskAiError, Result};
+// Executor batch module - handles parallel execution of tasks
 use crate::executor::planner::{ExecutionPlan, Task};
 use crate::executor::runner::CommandRunner;
 use crate::ui::BatchProgressDisplay;
@@ -181,7 +181,6 @@ impl BatchExecutor {
     /// 여러 작업 병렬 실행 (진행률 표시 포함)
     async fn execute_parallel_with_progress(&self, tasks: &[&Task], progress: &BatchProgressDisplay) -> Vec<TaskResult> {
         use futures::future::join_all;
-        use std::sync::Arc;
 
         let tasks_to_execute: Vec<_> = tasks.iter().map(|&t| t.clone()).collect();
 

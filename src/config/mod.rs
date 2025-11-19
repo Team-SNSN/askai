@@ -106,6 +106,7 @@ impl Config {
     }
 
     /// 설정 디렉토리 경로
+    #[allow(dead_code)]  // Used by save() method
     fn config_dir() -> PathBuf {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         PathBuf::from(home).join(".askai")
@@ -148,6 +149,7 @@ impl Config {
     /// config.default_provider = "claude".to_string();
     /// config.save().unwrap();
     /// ```
+    #[allow(dead_code)]  // Public API for config management
     pub fn save(&self) -> Result<()> {
         let config_dir = Self::config_dir();
         let config_path = Self::config_path();
@@ -170,6 +172,7 @@ impl Config {
     }
 
     /// 설정 파일 초기화 (기본값으로)
+    #[allow(dead_code)]  // Public API for config initialization
     pub fn init() -> Result<()> {
         let config = Self::default();
         config.save()

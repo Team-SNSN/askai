@@ -15,7 +15,7 @@ mod commands;
 use cli::Cli;
 use error::Result;
 use ai::{factory::ProviderFactory, history::{CommandHistory, HistoryStore}};
-use executor::{CommandValidator, CommandRunner};
+use executor::CommandValidator;
 use ui::{ConfirmPrompt, create_spinner};
 use chrono::Utc;
 use config::Config;

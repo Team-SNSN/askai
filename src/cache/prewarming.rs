@@ -1,5 +1,4 @@
 use crate::cache::ResponseCache;
-use crate::error::Result;
 
 /// 자주 사용하는 명령어 패턴들을 미리 캐싱
 ///

@@ -2,6 +2,5 @@ pub mod protocol;
 pub mod session;
 pub mod server;
 
-pub use protocol::{DaemonRequest, DaemonResponse};
-pub use session::SessionPool;
-pub use server::DaemonServer;
+// Note: DaemonRequest, DaemonResponse, and DaemonServer are accessed via full path
+// (e.g., daemon::protocol::DaemonRequest) rather than re-exports
