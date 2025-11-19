@@ -62,10 +62,14 @@ impl ResponseCache {
 
     /// 기본 설정으로 ResponseCache 생성
     ///
-    /// - TTL: 1시간
-    /// - Max entries: 1000
+    /// Config 파일에서 설정을 로드하여 사용
+    /// - TTL: config.cache_ttl_days (기본: 7일)
+    /// - Max entries: config.cache_max_entries (기본: 1000)
     pub fn default_config() -> Result<Self> {
-        Self::new(3600, 1000) // 1시간, 최대 1000개
+        // Config 로드 시도 (실패하면 기본값 사용)
+        let config = crate::config::Config::load().unwrap_or_default();
+        let ttl_seconds = config.cache_ttl_days * 86400; // days to seconds
+        Self::new(ttl_seconds, config.cache_max_entries)
     }
 
     /// 캐시 파일 경로 반환
