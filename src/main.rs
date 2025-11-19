@@ -10,6 +10,7 @@ mod config;
 mod context;
 mod cache;
 mod daemon;
+mod commands;
 
 use cli::Cli;
 use error::Result;
@@ -56,17 +57,17 @@ async fn main() -> Result<()> {
 
     // --daemon-start 옵션 처리 (데몬 서버 시작)
     if cli.daemon_start {
-        return start_daemon().await;
+        return commands::start_daemon().await;
     }
 
     // --daemon-stop 옵션 처리 (데몬 서버 종료)
     if cli.daemon_stop {
-        return stop_daemon().await;
+        return commands::stop_daemon().await;
     }
 
     // --daemon-status 옵션 처리 (데몬 서버 상태 확인)
     if cli.daemon_status {
-        return check_daemon_status().await;
+        return commands::check_daemon_status().await;
     }
 
     // 설정 파일 로드 (없으면 기본값 사용)
@@ -81,7 +82,7 @@ async fn main() -> Result<()> {
 
     // --batch 모드 처리
     if cli.batch {
-        return execute_batch_mode(&cli, &config).await;
+        return commands::execute_batch_mode(&cli, &config, &RESPONSE_CACHE).await;
     }
 
     // 1. 프롬프트 출력
@@ -270,267 +271,4 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-/// 배치 모드 실행: 여러 프로젝트에 대해 같은 명령어를 병렬 실행
-async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
-    use context::{ProjectScanner, ScanResult};
-    use executor::{planner::{ExecutionPlan, Task}, batch::BatchExecutor};
-    use std::env;
-
-    eprintln!("{} Running in batch mode...", "[>>]".cyan().bold());
-
-    // 1. 프로젝트 탐색
-    let scanner = if let Some(max_depth) = cli.max_parallel {
-        ProjectScanner::new(max_depth)
-    } else {
-        ProjectScanner::default()
-    };
-
-    let current_dir = env::current_dir()?;
-    let scan_result: ScanResult = scanner.scan(&current_dir);
-
-    if scan_result.projects.is_empty() {
-        eprintln!("{} No projects found.", "[X]".red());
-        return Ok(());
-    }
-
-    eprintln!(
-        "{} Found {} projects.",
-        "[PKG]".cyan(),
-        scan_result.projects.len().to_string().bold()
-    );
-
-    for (idx, project) in scan_result.projects.iter().enumerate() {
-        eprintln!(
-            "  {}. {} ({})",
-            idx + 1,
-            project.root_dir.display().to_string().dimmed(),
-            project.primary_type().as_str().yellow()
-        );
-    }
-
-    // 2. Provider 선택
-    let provider_name = cli.provider.as_deref().unwrap_or(&config.default_provider);
-    let provider = ProviderFactory::create(provider_name)?;
-
-    eprintln!(
-        "\n{} Generating commands for each project using {} provider...",
-        "[AI]".cyan(),
-        provider.name()
-    );
-
-    // 3. 각 프로젝트에 대해 명령어 생성 (캐시 활용)
-    let mut tasks = Vec::new();
-
-    for (idx, project) in scan_result.projects.iter().enumerate() {
-        let project_context = project.to_context_string();
-
-        // 캐시 확인
-        let command = if !cli.no_cache {
-            let mut cache = RESPONSE_CACHE.lock().unwrap();
-            if let Some(cached_command) = cache.get(&cli.prompt_text(), &project_context) {
-                eprintln!(
-                    "  {} {} - [*] Cache hit",
-                    "[v]".green(),
-                    project.root_dir.file_name().unwrap().to_str().unwrap()
-                );
-                cached_command
-            } else {
-                drop(cache);
-
-                let generated_command = provider
-                    .generate_command(&cli.prompt_text(), &project_context)
-                    .await?;
-
-                // 캐시 저장
-                let mut cache = RESPONSE_CACHE.lock().unwrap();
-                cache.set(&cli.prompt_text(), &project_context, generated_command.clone());
-
-                eprintln!(
-                    "  {} {} - {}",
-                    "[v]".green(),
-                    project.root_dir.file_name().unwrap().to_str().unwrap(),
-                    generated_command.dimmed()
-                );
-
-                generated_command
-            }
-        } else {
-            let generated_command = provider
-                .generate_command(&cli.prompt_text(), &project_context)
-                .await?;
-
-            eprintln!(
-                "  {} {} - {}",
-                "[v]".green(),
-                project.root_dir.file_name().unwrap().to_str().unwrap(),
-                generated_command.dimmed()
-            );
-
-            generated_command
-        };
-
-        // Task 생성
-        let task = Task::new(idx, command)
-            .with_dir(project.root_dir.display().to_string())
-            .with_description(format!(
-                "{}: {}",
-                project.root_dir.file_name().unwrap().to_str().unwrap(),
-                cli.prompt_text()
-            ));
-
-        tasks.push(task);
-    }
-
-    // 4. 실행 계획 생성
-    let mut plan = ExecutionPlan::new(tasks);
-    plan.can_parallelize = true;
-
-    // 5. 사용자 확인 (--yes 플래그가 없으면)
-    if !cli.yes && !cli.dry_run {
-        eprintln!("\n{} Execute the following tasks?", "[?]".cyan());
-        eprintln!("  - {} projects", plan.task_count());
-        eprintln!("  - Parallel execution: {}", if plan.can_parallelize { "Yes" } else { "No" });
-
-        let prompt = ConfirmPrompt::new();
-        // 간단히 첫 번째 명령어로 확인
-        if !plan.tasks.is_empty() {
-            if !prompt.confirm_execution(&plan.tasks[0].command, executor::DangerLevel::Low)? {
-                eprintln!("{}", "[X] User cancelled.".yellow());
-                std::process::exit(1);  // 사용자 취소는 exit code 1로 종료
-            }
-        }
-    } else if cli.dry_run {
-        eprintln!("\n{} Output commands only (will not execute).", "[i]".cyan());
-        return Ok(());
-    }
-
-    // 6. 병렬 실행
-    let max_parallel = cli.max_parallel.unwrap_or(4);
-    let executor = BatchExecutor::new(max_parallel);
-
-    eprintln!("\n{} Starting parallel execution...", "[*]".cyan().bold());
-    let batch_result = executor.execute(&plan).await;
-
-    // 7. 결과 출력
-    eprintln!("\n{} Batch execution complete!", "[OK]".green().bold());
-    eprintln!("  - Total tasks: {}", batch_result.total);
-    eprintln!("  - Success: {}", batch_result.success_count.to_string().green());
-    eprintln!("  - Failed: {}", batch_result.failure_count.to_string().red());
-    eprintln!(
-        "  - Success rate: {:.1}%",
-        batch_result.success_rate()
-    );
-    eprintln!("  - Execution time: {}ms", batch_result.total_duration_ms);
-
-    if !batch_result.failed_tasks().is_empty() {
-        eprintln!("\n{} Failed tasks:", "[X]".red());
-        for failed in batch_result.failed_tasks() {
-            eprintln!(
-                "  - {}: {}",
-                failed.description,
-                failed.error.as_ref().unwrap().red()
-            );
-        }
-    }
-
-    // 8. 캐시 저장
-    if let Err(e) = RESPONSE_CACHE.lock().unwrap().save_to_disk() {
-        if cli.debug {
-            eprintln!("{} Failed to save cache: {}", "DEBUG:".yellow(), e);
-        }
-    }
-
-    Ok(())
-}
-
-/// 데몬 서버 시작
-async fn start_daemon() -> Result<()> {
-    use daemon::server::DaemonServer;
-
-    eprintln!("{} Starting daemon server...\n", "[>>]".cyan().bold());
-
-    let server = DaemonServer::default_socket()?;
-
-    // Provider pre-warming
-    let spinner = create_spinner("Pre-warming providers...");
-    server.prewarm_providers(&["gemini"]).await?;
-    spinner.finish_and_clear();
-    eprintln!("{} Provider pre-warming complete", "[v]".green());
-
-    // 캐시 pre-warming
-    let spinner = create_spinner("Pre-warming cache...");
-    let ctx = context::get_current_context();
-    let count = server.prewarm_cache(&ctx).await;
-    spinner.finish_and_clear();
-    eprintln!("{} Added {} commands to cache.", "[v]".green(), count);
-
-    eprintln!();
-
-    // 서버 실행 (blocking)
-    server.start().await?;
-
-    Ok(())
-}
-
-/// 데몬 서버 종료
-async fn stop_daemon() -> Result<()> {
-    use daemon::protocol::DaemonRequest;
-    use daemon::server::DaemonClient;
-
-    eprintln!("{} Stopping daemon server...", "[STOP]".yellow());
-
-    let client = DaemonClient::default_client()?;
-    let request = DaemonRequest::Shutdown;
-
-    match client.send_request(&request).await {
-        Ok(_) => {
-            eprintln!("{} Daemon server stopped.", "[OK]".green());
-            Ok(())
-        }
-        Err(e) => {
-            eprintln!("{} Failed to stop daemon server: {}", "[X]".red(), e);
-            Err(e)
-        }
-    }
-}
-
-/// 데몬 서버 상태 확인
-async fn check_daemon_status() -> Result<()> {
-    use daemon::protocol::DaemonRequest;
-    use daemon::protocol::DaemonResponse;
-    use daemon::server::DaemonClient;
-
-    if !DaemonClient::is_running().await {
-        eprintln!("{} Daemon server is not running.", "[X]".red());
-        eprintln!("\n{} To start the daemon server:", "[TIP]".cyan());
-        eprintln!("  {}", "askai --daemon-start".yellow());
-        return Ok(());
-    }
-
-    let client = DaemonClient::default_client()?;
-    let request = DaemonRequest::Ping;
-
-    match client.send_request(&request).await {
-        Ok(response) => match response {
-            DaemonResponse::Pong {
-                uptime_seconds,
-                session_count,
-            } => {
-                eprintln!("{} Daemon server is running.", "[OK]".green().bold());
-                eprintln!("  [>] Uptime: {} seconds", uptime_seconds);
-                eprintln!("  [PKG] Loaded providers: {}", session_count);
-                Ok(())
-            }
-            _ => {
-                eprintln!("{} Unexpected response", "[!]".yellow());
-                Ok(())
-            }
-        },
-        Err(e) => {
-            eprintln!("{} Failed to check daemon status: {}", "[X]".red(), e);
-            Err(e)
-        }
-    }
 }

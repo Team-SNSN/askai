@@ -2,14 +2,26 @@ use crate::error::{AskAiError, Result};
 use colored::*;
 use tokio::process::Command;
 
-pub struct CommandRunner;
+pub struct CommandRunner {
+    dry_run: bool,
+}
 
 impl CommandRunner {
     pub fn new() -> Self {
-        Self
+        Self { dry_run: false }
+    }
+
+    pub fn with_dry_run(mut self, dry_run: bool) -> Self {
+        self.dry_run = dry_run;
+        self
     }
 
     pub async fn execute(&self, command: &str) -> Result<String> {
+        if self.dry_run {
+            eprintln!("{} {}", "[DRY-RUN]".yellow().bold(), command);
+            return Ok(format!("[DRY-RUN] {}", command));
+        }
+
         println!("{} {}", "[>] Executing:".cyan(), command);
 
         let output = Command::new("bash")
@@ -32,5 +44,11 @@ impl CommandRunner {
         }
 
         Ok(stdout)
+    }
+}
+
+impl Default for CommandRunner {
+    fn default() -> Self {
+        Self::new()
     }
 }
