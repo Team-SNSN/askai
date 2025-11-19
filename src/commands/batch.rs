@@ -28,7 +28,13 @@ pub async fn execute_batch_mode(cli: &Cli, config: &Config, response_cache: &Laz
     };
 
     let current_dir = env::current_dir()?;
-    let mut scan_result: ScanResult = scanner.scan(&current_dir);
+    let mut scan_result: ScanResult = if let Some(targets_pattern) = &cli.targets {
+        // Target 패턴이 지정된 경우: glob 패턴으로 프로젝트 검색
+        scanner.scan_pattern(targets_pattern)
+    } else {
+        // Target 패턴이 없는 경우: 현재 디렉토리 하위 탐색
+        scanner.scan(&current_dir)
+    };
 
     // 프로젝트 타입 필터링 (--project-type 옵션이 있으면)
     if let Some(project_type_str) = &cli.project_type {
