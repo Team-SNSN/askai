@@ -11,6 +11,7 @@ mod context;
 mod cache;
 mod daemon;
 mod commands;
+mod plugin;
 
 use cli::Cli;
 use error::Result;
