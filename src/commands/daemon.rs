@@ -85,3 +85,13 @@ pub async fn check_daemon_status() -> Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_daemon_module_exists() {
+        // Placeholder test to establish test infrastructure for daemon commands
+        // Integration tests would be more appropriate for daemon functionality
+        assert!(true);
+    }
+}

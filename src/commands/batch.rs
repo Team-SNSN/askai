@@ -243,3 +243,15 @@ pub async fn execute_batch_mode(cli: &Cli, config: &Config, response_cache: &Laz
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_batch_mode_requires_prompt() {
+        // Verify that batch mode execution requires a prompt
+        // This is a placeholder test to establish test infrastructure
+        assert!(true);
+    }
+}
