@@ -103,7 +103,7 @@ impl BatchExecutor {
         let total = plan.task_count();
 
         // 프로그레스 디스플레이 생성
-        let progress = BatchProgressDisplay::new(total, "배치 실행");
+        let progress = BatchProgressDisplay::new(total, "Batch execution");
 
         let mut all_results = Vec::new();
 
@@ -146,7 +146,7 @@ impl BatchExecutor {
 
         // 작업 스피너 추가
         let spinner = progress.add_task(&task.description);
-        spinner.set_message("실행 중...".to_string());
+        spinner.set_message("Executing...".to_string());
 
         // working_dir이 있으면 cd를 포함한 명령어 생성
         let command = if let Some(dir) = &task.working_dir {
@@ -175,7 +175,7 @@ impl BatchExecutor {
 
         println!(
             "  {} {}",
-            "▶️".cyan(),
+            "[>]".cyan(),
             task.description.dimmed()
         );
 
@@ -191,7 +191,7 @@ impl BatchExecutor {
                 let duration = start_time.elapsed().as_millis();
                 println!(
                     "    {} {} ({}ms)",
-                    "✓".green(),
+                    "[v]".green(),
                     task.description,
                     duration
                 );
@@ -233,7 +233,7 @@ impl BatchExecutor {
                 tokio::spawn(async move {
                     let start_time = Instant::now();
 
-                    spinner.set_message("실행 중...".to_string());
+                    spinner.set_message("Executing...".to_string());
 
                     // working_dir이 있으면 cd를 포함한 명령어 생성
                     let command = if let Some(dir) = &task.working_dir {
@@ -245,12 +245,12 @@ impl BatchExecutor {
                     let result = match runner.execute(&command).await {
                         Ok(output) => {
                             let duration = start_time.elapsed().as_millis();
-                            spinner.finish_with_message(format!("{} ({}ms)", "완료".green(), duration));
+                            spinner.finish_with_message(format!("{} ({}ms)", "Complete".green(), duration));
                             TaskResult::success(&task, output, duration)
                         }
                         Err(e) => {
                             let duration = start_time.elapsed().as_millis();
-                            spinner.finish_with_message(format!("{} {}", "실패".red(), e.to_string().dimmed()));
+                            spinner.finish_with_message(format!("{} {}", "Failed".red(), e.to_string().dimmed()));
                             TaskResult::failure(&task, e.to_string(), duration)
                         }
                     };
@@ -284,7 +284,7 @@ impl BatchExecutor {
 
                     println!(
                         "  {} {}",
-                        "▶️".cyan(),
+                        "[>]".cyan(),
                         task.description.dimmed()
                     );
 
@@ -300,7 +300,7 @@ impl BatchExecutor {
                             let duration = start_time.elapsed().as_millis();
                             println!(
                                 "    {} {} ({}ms)",
-                                "✓".green(),
+                                "[v]".green(),
                                 task.description,
                                 duration
                             );

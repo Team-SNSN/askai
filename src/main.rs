@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
     if cli.clear_cache {
         let mut cache = RESPONSE_CACHE.lock().unwrap();
         cache.clear()?;
-        println!("{} 캐시가 삭제되었습니다.", "✅".green());
+        eprintln!("{} Cache cleared.", "[OK]".green());
         return Ok(());
     }
 
@@ -48,9 +48,9 @@ async fn main() -> Result<()> {
         let mut cache = RESPONSE_CACHE.lock().unwrap();
         let count = cache.prewarm(&ctx);
         cache.save_to_disk()?;
-        println!("{} {}개의 자주 사용하는 명령어를 캐시에 추가했습니다.", "✅".green(), count);
-        println!("{} 터미널 시작 시 이 명령어를 실행하면 더 빠른 응답을 받을 수 있습니다:", "💡".cyan());
-        println!("  {}", "echo 'askai --prewarm-cache &' >> ~/.zshrc".yellow());
+        eprintln!("{} Added {} frequently used commands to cache.", "[OK]".green(), count);
+        eprintln!("{} Run this command at terminal startup for faster responses:", "[TIP]".cyan());
+        eprintln!("  {}", "echo 'askai --prewarm-cache &' >> ~/.zshrc".yellow());
         return Ok(());
     }
 
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
     let provider_name = cli.provider.as_deref().unwrap_or(&config.default_provider);
 
     if cli.debug {
-        println!("{} {:?}", "DEBUG:".yellow(), cli);
+        eprintln!("{} {:?}", "DEBUG:".yellow(), cli);
     }
 
     // --batch 모드 처리
@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
 
     // 1. 프롬프트 출력
     if !cli.quiet {
-        eprintln!("{} {}", "🔍 프롬프트:".cyan(), cli.prompt_text());
+        eprintln!("{} {}", "[?] Prompt:".cyan(), cli.prompt_text());
     }
 
     // 2. 컨텍스트 수집 (RAG: 관련 히스토리 포함)
@@ -108,10 +108,10 @@ async fn main() -> Result<()> {
 
         if !DaemonClient::is_running().await {
             if !cli.quiet {
-                eprintln!("{} 데몬 서버가 실행되고 있지 않습니다.", "⚠️".yellow());
-                eprintln!("{} 데몬 모드로 실행하려면 먼저 데몬 서버를 시작하세요:", "💡".cyan());
+                eprintln!("{} Daemon server is not running.", "[!]".yellow());
+                eprintln!("{} To run in daemon mode, first start the daemon server:", "[TIP]".cyan());
                 eprintln!("  {}", "askai --daemon-start".yellow());
-                eprintln!("\n{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                eprintln!("\n{} Continuing in normal mode...", "[i]".cyan());
             }
             String::new() // 일반 모드로 fallback
         } else {
@@ -126,9 +126,9 @@ async fn main() -> Result<()> {
                 Ok(DaemonResponse::Success { command, from_cache }) => {
                     if !cli.quiet {
                         if from_cache {
-                            eprintln!("{} 데몬 캐시에서 즉시 응답!", "⚡".green().bold());
+                            eprintln!("{} Instant response from daemon cache!", "[*]".green().bold());
                         } else {
-                            eprintln!("{} 데몬이 명령어를 생성했습니다.", "🤖".cyan());
+                            eprintln!("{} Daemon generated the command.", "[AI]".cyan());
                         }
                     }
                     // 명령어를 얻었으므로 이 블록의 결과로 사용
@@ -136,22 +136,22 @@ async fn main() -> Result<()> {
                 }
                 Ok(DaemonResponse::Error { message }) => {
                     if !cli.quiet {
-                        eprintln!("{} 데몬 에러: {}", "❌".red(), message);
-                        eprintln!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                        eprintln!("{} Daemon error: {}", "[X]".red(), message);
+                        eprintln!("{} Continuing in normal mode...", "[i]".cyan());
                     }
                     // 일반 모드로 fallback
                     String::new() // 임시값, 아래에서 덮어씀
                 }
                 Err(e) => {
                     if !cli.quiet {
-                        eprintln!("{} 데몬 통신 에러: {}", "❌".red(), e);
-                        eprintln!("{} 일반 모드로 계속 진행합니다...", "ℹ️".cyan());
+                        eprintln!("{} Daemon communication error: {}", "[X]".red(), e);
+                        eprintln!("{} Continuing in normal mode...", "[i]".cyan());
                     }
                     String::new() // fallback
                 }
                 _ => {
                     if !cli.quiet {
-                        eprintln!("{} 예상치 못한 응답", "⚠️".yellow());
+                        eprintln!("{} Unexpected response", "[!]".yellow());
                     }
                     String::new()
                 }
@@ -170,7 +170,7 @@ async fn main() -> Result<()> {
             let mut cache = RESPONSE_CACHE.lock().unwrap();
             if let Some(cached_command) = cache.get(&cli.prompt_text(), &ctx) {
                 if !cli.quiet {
-                    eprintln!("{} 캐시에서 즉시 응답! (AI 호출 생략)", "⚡".green().bold());
+                    eprintln!("{} Instant response from cache! (Skipping AI call)", "[*]".green().bold());
                 }
                 cached_command
             } else {
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
 
                 let spinner = if !cli.quiet {
                     create_spinner(&format!(
-                        "{} provider로 명령어 생성 중...",
+                        "Generating command with {} provider...",
                         provider.name()
                     ))
                 } else {
@@ -189,7 +189,7 @@ async fn main() -> Result<()> {
 
                 spinner.finish_and_clear();
                 if !cli.quiet {
-                    eprintln!("{} 명령어 생성 완료!", "✓".green());
+                    eprintln!("{} Command generation complete!", "[v]".green());
                 }
 
                 // 캐시에 저장
@@ -213,7 +213,7 @@ async fn main() -> Result<()> {
 
             spinner.finish_and_clear();
             if !cli.quiet {
-                eprintln!("{} 명령어 생성 완료!", "✓".green());
+                eprintln!("{} 명령어 생성 완료!", "[v]".green());
             }
 
             generated_command
@@ -230,15 +230,15 @@ async fn main() -> Result<()> {
     if !cli.yes && !cli.quiet {
         let prompt = ConfirmPrompt::new();
         if !prompt.confirm_execution(&command, danger_level)? {
-            eprintln!("{}", "❌ 사용자가 취소했습니다.".yellow());
-            return Ok(());
+            eprintln!("{}", "[X] User cancelled.".yellow());
+            std::process::exit(1);  // 사용자 취소는 exit code 1로 종료
         }
     } else if !cli.yes && cli.quiet {
         // quiet 모드에서는 자동으로 yes로 처리 (위험할 수 있음)
         // 또는 에러를 반환할 수도 있음
         // 여기서는 안전을 위해 에러 반환
-        eprintln!("{}", "❌ quiet 모드에서는 --yes 플래그가 필요합니다.".red());
-        return Ok(());
+        eprintln!("{}", "[X] --yes flag required in quiet mode.".red());
+        std::process::exit(1);  // 에러는 exit code 1로 종료
     }
 
     // 6. 명령어를 stdout에 출력 (stderr에는 아무것도 출력하지 않음)
@@ -257,7 +257,7 @@ async fn main() -> Result<()> {
 
     if let Err(e) = store.add(history_entry) {
         if cli.debug {
-            eprintln!("{} 히스토리 저장 실패: {}", "DEBUG:".yellow(), e);
+            eprintln!("{} Failed to save history: {}", "DEBUG:".yellow(), e);
         }
         // 히스토리 저장 실패는 치명적이지 않으므로 계속 진행
     }
@@ -265,7 +265,7 @@ async fn main() -> Result<()> {
     // 캐시를 디스크에 저장
     if let Err(e) = RESPONSE_CACHE.lock().unwrap().save_to_disk() {
         if cli.debug {
-            eprintln!("{} 캐시 저장 실패: {}", "DEBUG:".yellow(), e);
+            eprintln!("{} Failed to save cache: {}", "DEBUG:".yellow(), e);
         }
     }
 
@@ -278,7 +278,7 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
     use executor::{planner::{ExecutionPlan, Task}, batch::BatchExecutor};
     use std::env;
 
-    println!("{} 배치 모드로 실행합니다...", "🚀".cyan().bold());
+    eprintln!("{} Running in batch mode...", "[>>]".cyan().bold());
 
     // 1. 프로젝트 탐색
     let scanner = if let Some(max_depth) = cli.max_parallel {
@@ -291,18 +291,18 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
     let scan_result: ScanResult = scanner.scan(&current_dir);
 
     if scan_result.projects.is_empty() {
-        println!("{} 프로젝트를 찾을 수 없습니다.", "❌".red());
+        eprintln!("{} No projects found.", "[X]".red());
         return Ok(());
     }
 
-    println!(
-        "{} {}개의 프로젝트를 발견했습니다.",
-        "📦".cyan(),
+    eprintln!(
+        "{} Found {} projects.",
+        "[PKG]".cyan(),
         scan_result.projects.len().to_string().bold()
     );
 
     for (idx, project) in scan_result.projects.iter().enumerate() {
-        println!(
+        eprintln!(
             "  {}. {} ({})",
             idx + 1,
             project.root_dir.display().to_string().dimmed(),
@@ -314,9 +314,9 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
     let provider_name = cli.provider.as_deref().unwrap_or(&config.default_provider);
     let provider = ProviderFactory::create(provider_name)?;
 
-    println!(
-        "\n{} {} provider로 각 프로젝트에 대한 명령어 생성 중...",
-        "🤖".cyan(),
+    eprintln!(
+        "\n{} Generating commands for each project using {} provider...",
+        "[AI]".cyan(),
         provider.name()
     );
 
@@ -330,9 +330,9 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
         let command = if !cli.no_cache {
             let mut cache = RESPONSE_CACHE.lock().unwrap();
             if let Some(cached_command) = cache.get(&cli.prompt_text(), &project_context) {
-                println!(
-                    "  {} {} - ⚡ 캐시 히트",
-                    "✓".green(),
+                eprintln!(
+                    "  {} {} - [*] Cache hit",
+                    "[v]".green(),
                     project.root_dir.file_name().unwrap().to_str().unwrap()
                 );
                 cached_command
@@ -347,9 +347,9 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
                 let mut cache = RESPONSE_CACHE.lock().unwrap();
                 cache.set(&cli.prompt_text(), &project_context, generated_command.clone());
 
-                println!(
+                eprintln!(
                     "  {} {} - {}",
-                    "✓".green(),
+                    "[v]".green(),
                     project.root_dir.file_name().unwrap().to_str().unwrap(),
                     generated_command.dimmed()
                 );
@@ -361,9 +361,9 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
                 .generate_command(&cli.prompt_text(), &project_context)
                 .await?;
 
-            println!(
+            eprintln!(
                 "  {} {} - {}",
-                "✓".green(),
+                "[v]".green(),
                 project.root_dir.file_name().unwrap().to_str().unwrap(),
                 generated_command.dimmed()
             );
@@ -389,20 +389,20 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
 
     // 5. 사용자 확인 (--yes 플래그가 없으면)
     if !cli.yes && !cli.dry_run {
-        println!("\n{} 다음 작업을 실행하시겠습니까?", "❓".cyan());
-        println!("  - {} 개의 프로젝트", plan.task_count());
-        println!("  - 병렬 실행: {}", if plan.can_parallelize { "예" } else { "아니오" });
+        eprintln!("\n{} Execute the following tasks?", "[?]".cyan());
+        eprintln!("  - {} projects", plan.task_count());
+        eprintln!("  - Parallel execution: {}", if plan.can_parallelize { "Yes" } else { "No" });
 
         let prompt = ConfirmPrompt::new();
         // 간단히 첫 번째 명령어로 확인
         if !plan.tasks.is_empty() {
             if !prompt.confirm_execution(&plan.tasks[0].command, executor::DangerLevel::Low)? {
-                println!("{}", "❌ 사용자가 취소했습니다.".yellow());
-                return Ok(());
+                eprintln!("{}", "[X] User cancelled.".yellow());
+                std::process::exit(1);  // 사용자 취소는 exit code 1로 종료
             }
         }
     } else if cli.dry_run {
-        println!("\n{} 명령어만 출력합니다 (실행하지 않음).", "ℹ️".cyan());
+        eprintln!("\n{} Output commands only (will not execute).", "[i]".cyan());
         return Ok(());
     }
 
@@ -410,24 +410,24 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
     let max_parallel = cli.max_parallel.unwrap_or(4);
     let executor = BatchExecutor::new(max_parallel);
 
-    println!("\n{} 병렬 실행 시작...", "⚡".cyan().bold());
+    eprintln!("\n{} Starting parallel execution...", "[*]".cyan().bold());
     let batch_result = executor.execute(&plan).await;
 
     // 7. 결과 출력
-    println!("\n{} 배치 실행 완료!", "✅".green().bold());
-    println!("  - 총 작업: {}", batch_result.total);
-    println!("  - 성공: {}", batch_result.success_count.to_string().green());
-    println!("  - 실패: {}", batch_result.failure_count.to_string().red());
-    println!(
-        "  - 성공률: {:.1}%",
+    eprintln!("\n{} Batch execution complete!", "[OK]".green().bold());
+    eprintln!("  - Total tasks: {}", batch_result.total);
+    eprintln!("  - Success: {}", batch_result.success_count.to_string().green());
+    eprintln!("  - Failed: {}", batch_result.failure_count.to_string().red());
+    eprintln!(
+        "  - Success rate: {:.1}%",
         batch_result.success_rate()
     );
-    println!("  - 실행 시간: {}ms", batch_result.total_duration_ms);
+    eprintln!("  - Execution time: {}ms", batch_result.total_duration_ms);
 
     if !batch_result.failed_tasks().is_empty() {
-        println!("\n{} 실패한 작업:", "❌".red());
+        eprintln!("\n{} Failed tasks:", "[X]".red());
         for failed in batch_result.failed_tasks() {
-            println!(
+            eprintln!(
                 "  - {}: {}",
                 failed.description,
                 failed.error.as_ref().unwrap().red()
@@ -438,7 +438,7 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
     // 8. 캐시 저장
     if let Err(e) = RESPONSE_CACHE.lock().unwrap().save_to_disk() {
         if cli.debug {
-            println!("{} 캐시 저장 실패: {}", "DEBUG:".yellow(), e);
+            eprintln!("{} Failed to save cache: {}", "DEBUG:".yellow(), e);
         }
     }
 
@@ -449,24 +449,24 @@ async fn execute_batch_mode(cli: &Cli, config: &Config) -> Result<()> {
 async fn start_daemon() -> Result<()> {
     use daemon::server::DaemonServer;
 
-    println!("{} 데몬 서버를 시작합니다...\n", "🚀".cyan().bold());
+    eprintln!("{} Starting daemon server...\n", "[>>]".cyan().bold());
 
     let server = DaemonServer::default_socket()?;
 
     // Provider pre-warming
-    let spinner = create_spinner("Provider pre-warming 중...");
+    let spinner = create_spinner("Pre-warming providers...");
     server.prewarm_providers(&["gemini"]).await?;
     spinner.finish_and_clear();
-    println!("{} Provider pre-warming 완료", "✓".green());
+    eprintln!("{} Provider pre-warming complete", "[v]".green());
 
     // 캐시 pre-warming
-    let spinner = create_spinner("캐시 pre-warming 중...");
+    let spinner = create_spinner("Pre-warming cache...");
     let ctx = context::get_current_context();
     let count = server.prewarm_cache(&ctx).await;
     spinner.finish_and_clear();
-    println!("{} {}개의 명령어를 캐시에 추가했습니다.", "✓".green(), count);
+    eprintln!("{} Added {} commands to cache.", "[v]".green(), count);
 
-    println!();
+    eprintln!();
 
     // 서버 실행 (blocking)
     server.start().await?;
@@ -479,18 +479,18 @@ async fn stop_daemon() -> Result<()> {
     use daemon::protocol::DaemonRequest;
     use daemon::server::DaemonClient;
 
-    println!("{} 데몬 서버를 종료합니다...", "🛑".yellow());
+    eprintln!("{} Stopping daemon server...", "[STOP]".yellow());
 
     let client = DaemonClient::default_client()?;
     let request = DaemonRequest::Shutdown;
 
     match client.send_request(&request).await {
         Ok(_) => {
-            println!("{} 데몬 서버가 종료되었습니다.", "✅".green());
+            eprintln!("{} Daemon server stopped.", "[OK]".green());
             Ok(())
         }
         Err(e) => {
-            println!("{} 데몬 서버 종료 실패: {}", "❌".red(), e);
+            eprintln!("{} Failed to stop daemon server: {}", "[X]".red(), e);
             Err(e)
         }
     }
@@ -503,9 +503,9 @@ async fn check_daemon_status() -> Result<()> {
     use daemon::server::DaemonClient;
 
     if !DaemonClient::is_running().await {
-        println!("{} 데몬 서버가 실행되고 있지 않습니다.", "❌".red());
-        println!("\n{} 데몬 서버를 시작하려면:", "💡".cyan());
-        println!("  {}", "askai --daemon-start".yellow());
+        eprintln!("{} Daemon server is not running.", "[X]".red());
+        eprintln!("\n{} To start the daemon server:", "[TIP]".cyan());
+        eprintln!("  {}", "askai --daemon-start".yellow());
         return Ok(());
     }
 
@@ -518,18 +518,18 @@ async fn check_daemon_status() -> Result<()> {
                 uptime_seconds,
                 session_count,
             } => {
-                println!("{} 데몬 서버가 실행 중입니다.", "✅".green().bold());
-                println!("  ⏱️  Uptime: {}초", uptime_seconds);
-                println!("  📦 Loaded providers: {}", session_count);
+                eprintln!("{} Daemon server is running.", "[OK]".green().bold());
+                eprintln!("  [>] Uptime: {} seconds", uptime_seconds);
+                eprintln!("  [PKG] Loaded providers: {}", session_count);
                 Ok(())
             }
             _ => {
-                println!("{} 예상치 못한 응답", "⚠️".yellow());
+                eprintln!("{} Unexpected response", "[!]".yellow());
                 Ok(())
             }
         },
         Err(e) => {
-            println!("{} 데몬 서버 상태 확인 실패: {}", "❌".red(), e);
+            eprintln!("{} Failed to check daemon status: {}", "[X]".red(), e);
             Err(e)
         }
     }

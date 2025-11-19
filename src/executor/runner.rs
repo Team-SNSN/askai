@@ -10,7 +10,7 @@ impl CommandRunner {
     }
 
     pub async fn execute(&self, command: &str) -> Result<String> {
-        println!("{} {}", "▶️  실행 중:".cyan(), command);
+        println!("{} {}", "[>] Executing:".cyan(), command);
 
         let output = Command::new("bash")
             .arg("-c")
@@ -23,7 +23,7 @@ impl CommandRunner {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
         if !output.status.success() {
-            eprintln!("{} {}", "❌ 에러:".red(), stderr);
+            eprintln!("{} {}", "[X] Error:".red(), stderr);
             return Err(AskAiError::ExecutionError(stderr));
         }
 

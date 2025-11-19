@@ -75,8 +75,8 @@ impl DaemonServer {
         })?;
 
         println!(
-            "{} 데몬 서버가 시작되었습니다.",
-            "✅".green().bold()
+            "{} Daemon server started.",
+            "[OK]".green().bold()
         );
         println!("  Socket: {}", self.socket_path.display());
 
@@ -112,7 +112,7 @@ impl DaemonServer {
             }
         }
 
-        println!("{} 데몬 서버가 종료되었습니다.", "👋".cyan());
+        println!("{} Daemon server stopped.", "[BYE]".cyan());
 
         // 정리
         self.cleanup()?;
@@ -230,14 +230,14 @@ impl DaemonServer {
             if let Err(e) = self.session_pool.prewarm_provider(provider_name).await {
                 eprintln!(
                     "{} Provider '{}' pre-warming failed: {}",
-                    "⚠️".yellow(),
+                    "[!]".yellow(),
                     provider_name,
                     e
                 );
             } else {
                 println!(
                     "  {} Provider '{}' pre-warmed",
-                    "✓".green(),
+                    "[v]".green(),
                     provider_name
                 );
             }

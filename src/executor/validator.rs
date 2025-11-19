@@ -25,7 +25,7 @@ impl CommandValidator {
         for pattern in Self::DANGEROUS_PATTERNS {
             if command.contains(pattern) {
                 return Err(AskAiError::DangerousCommand(format!(
-                    "위험한 패턴 감지: {}",
+                    "Dangerous pattern detected: {}",
                     pattern
                 )));
             }
